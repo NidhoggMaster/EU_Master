@@ -328,6 +328,19 @@ button { font: inherit; }
 .simple-hero h1 { max-width: 720px; margin: 0; font-size: clamp(48px, 7vw, 82px); line-height: 1.05; letter-spacing: -.06em; }
 .simple-hero p { margin: 24px 0 0; color: var(--muted); font-size: 18px; }
 .simple-cta { margin-top: 34px; }
+.country-picker { position: relative; width: 220px; }
+.country-picker summary { min-height: 50px; display: flex; align-items: center; justify-content: space-between; border-radius: 10px 3px 10px 3px; padding: 0 20px; background: var(--navy); color: white; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 13px 28px rgba(22,62,58,.18); list-style: none; }
+.country-picker summary::-webkit-details-marker { display: none; }
+.country-picker summary span { font-size: 18px; transition: transform .18s ease; }
+.country-picker[open] summary span { transform: rotate(180deg); }
+.country-menu { position: absolute; z-index: 20; top: calc(100% + 9px); left: 0; width: 280px; border: 1px solid #d6e2de; border-radius: 12px 4px 12px 4px; padding: 7px; background: white; box-shadow: 0 18px 38px rgba(36,65,60,.14); }
+.country-option { min-height: 62px; display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 12px; border-radius: 9px 3px 9px 3px; padding: 9px 12px; }
+.country-option:hover { background: #edf5f1; }
+.country-code { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px 3px 10px 3px; background: #e0efe9; color: #27685e; font-size: 10px; font-weight: 900; }
+.country-name { display: flex; flex-direction: column; }
+.country-name strong { font-size: 12px; }
+.country-name small { margin-top: 4px; color: #82908d; font-size: 8px; }
+.country-option > span:last-child { color: #51766f; font-weight: 800; }
 .simple-features { background: white; }
 .simple-feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
 .simple-feature { min-height: 190px; padding: 37px 34px; border-right: 1px solid var(--line); }

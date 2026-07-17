@@ -27,12 +27,23 @@ export default function Home() {
       <section className="simple-hero">
         <div className="simple-shape" aria-hidden="true" />
         <div className="site-shell simple-hero-inner">
-          <span className="simple-kicker">NL · MASTER · 2027+</span>
-          <h1>荷兰硕士申请管理</h1>
-          <p>项目、材料、截止日期，集中管理。</p>
-          <Link className="button button-primary simple-cta" href="/dashboard">
-            进入控制台 <span aria-hidden="true">→</span>
-          </Link>
+          <span className="simple-kicker">EUROPE · MASTER · 2027+</span>
+          <h1>欧洲硕士申请管理</h1>
+          <details className="country-picker simple-cta">
+            <summary>
+              选择国家 <span aria-hidden="true">⌄</span>
+            </summary>
+            <div className="country-menu">
+              <Link className="country-option" href="/dashboard">
+                <span className="country-code">NL</span>
+                <span className="country-name">
+                  <strong>荷兰</strong>
+                  <small>Netherlands</small>
+                </span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </details>
         </div>
       </section>
 

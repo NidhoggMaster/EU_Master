@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s · EU Master",
   },
   description:
-    "面向荷兰研究型大学英语授课硕士项目的申请规划与材料管理工作台。",
+    "面向欧洲硕士项目的申请规划与材料管理工作台，首期开放荷兰。",
 };
 
 export default function RootLayout({
