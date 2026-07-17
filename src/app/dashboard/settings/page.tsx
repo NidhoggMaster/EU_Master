@@ -59,7 +59,7 @@ export default function SettingsPage() {
     if (exportMode === "encrypted") {
       if (exportPassword.length < 8) { setMessage("加密密码至少需要 8 个字符。"); return; }
       if (exportPassword !== exportPasswordAgain) { setMessage("两次输入的备份密码不一致。"); return; }
-    } else if (!window.confirm("普通 ZIP 不加密，任何拿到文件的人都能查看档案和材料。仍要继续吗？")) {
+    } else if (!window.confirm("普通 ZIP 不加密，任何拿到文件的人都能查看申请数据和材料。仍要继续吗？")) {
       return;
     }
     setWorking(true);
@@ -91,7 +91,7 @@ export default function SettingsPage() {
   }
 
   async function handleRestore() {
-    if (!preview || !window.confirm("恢复会替换当前浏览器中的档案、项目、材料和申请。确定继续吗？")) return;
+    if (!preview || !window.confirm("恢复会替换当前浏览器中的项目、材料和申请。Supabase 个人档案不会被替换。确定继续吗？")) return;
     setWorking(true); setMessage("正在恢复备份，请不要关闭页面…");
     try {
       await restoreBackup(preview.records, preview.versions);

@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { getApplications, getMaterials, getProfile, getPrograms } from "@/lib/db";
+import { getApplications, getMaterials, getPrograms } from "@/lib/db";
+import { getRemoteProfile } from "@/lib/profile-api";
 import { applicationProgress, profileCompletion } from "@/lib/progress";
 import { useLocalQuery } from "@/lib/use-local-query";
 
 async function loadDashboard() {
   const [profile, programs, materials, applications] = await Promise.all([
-    getProfile(), getPrograms(), getMaterials(), getApplications(),
+    getRemoteProfile(), getPrograms(), getMaterials(), getApplications(),
   ]);
   return { profile, programs, materials, applications };
 }
@@ -43,7 +44,7 @@ export default function DashboardPage() {
         <div>
           <span className="dashboard-date">2027 秋季入学规划</span>
           <h1>申请工作台</h1>
-          <p>项目、材料、任务和截止日期都保存在当前设备。</p>
+          <p>个人档案保存在 Supabase，项目、材料、任务和截止日期保存在当前设备。</p>
         </div>
         <Link className="dashboard-primary link-button" href={profilePercent ? "/dashboard/programs" : "/dashboard/profile"}>
           {profilePercent ? "查看项目目录" : "建立个人档案"}
@@ -51,7 +52,7 @@ export default function DashboardPage() {
       </div>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
-      {loading && <div className="notice">正在读取本地数据…</div>}
+      {loading && <div className="notice">正在读取 Supabase 档案和本地申请数据…</div>}
 
       <div className="summary-grid" aria-label="申请数据概览">
         {summaryCards.map((card) => (
@@ -101,7 +102,7 @@ export default function DashboardPage() {
       <section className="getting-started local-warning">
         <div className="getting-copy">
           <span className="getting-number">!</span>
-          <div><span className="panel-label">本地数据提醒</span><h2>清理浏览器数据会删除档案和材料</h2></div>
+          <div><span className="panel-label">本地数据提醒</span><h2>清理浏览器数据会删除材料和申请，但不会删除 Supabase 档案</h2></div>
         </div>
         <Link href="/dashboard/settings">前往备份设置 →</Link>
       </section>

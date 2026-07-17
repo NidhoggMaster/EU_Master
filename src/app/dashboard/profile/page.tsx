@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { z } from "zod";
-import { getProfile, saveProfile } from "@/lib/db";
+import { getRemoteProfile, saveRemoteProfile } from "@/lib/profile-api";
+import { applicantProfileSchema } from "@/lib/profile-schema";
 import { emptyProfile, profileCompletion } from "@/lib/progress";
 import type { ApplicantProfile, Course, EducationRecord, Experience, TestScore } from "@/lib/types";
 
@@ -10,38 +10,37 @@ const newEducation = (): EducationRecord => ({ id: crypto.randomUUID(), institut
 const newCourse = (): Course => ({ id: crypto.randomUUID(), name: "", grade: "", credits: "", category: "" });
 const newTest = (): TestScore => ({ id: crypto.randomUUID(), type: "IELTS", score: "", testDate: "" });
 const newExperience = (): Experience => ({ id: crypto.randomUUID(), type: "实习", organization: "", title: "", startDate: "", endDate: "", description: "" });
-const profileFormSchema = z.object({
-  basic: z.object({
-    fullName: z.string().max(120),
-    email: z.string().refine((value) => !value || /^\S+@\S+\.\S+$/.test(value), "请输入有效的邮箱地址。"),
-    nationality: z.string().max(120),
-    currentCity: z.string().max(120),
-  }),
-});
-
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ApplicantProfile>(emptyProfile());
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    getProfile().then((value) => value && setProfile(value)).catch(() => setMessage("读取档案失败，请刷新重试。")).finally(() => setLoading(false));
+    getRemoteProfile()
+      .then((value) => value && setProfile(value))
+      .catch((reason) => setMessage(reason instanceof Error ? reason.message : "读取档案失败，请刷新重试。"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleSave(event: React.FormEvent) {
     event.preventDefault();
-    const validation = profileFormSchema.safeParse(profile);
+    const validation = applicantProfileSchema.safeParse(profile);
     if (!validation.success) {
       setMessage(validation.error.issues[0]?.message || "档案字段格式不正确。");
       return;
     }
+    setSaving(true);
+    setMessage("");
     try {
       const next = { ...profile, updatedAt: new Date().toISOString() };
-      await saveProfile(next);
-      setProfile(next);
-      setMessage("档案已保存在当前浏览器。");
-    } catch {
-      setMessage("保存失败，请检查浏览器是否允许本地存储。");
+      const saved = await saveRemoteProfile(next);
+      setProfile(saved);
+      setMessage("个人档案已通过后端安全写入 Supabase。");
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "个人档案保存失败，请稍后重试。");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -164,7 +163,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <div className="sticky-save"><span>档案完成度 {completion}%</span><button className="dashboard-primary" type="submit">保存个人档案</button></div>
+        <div className="sticky-save"><span>档案完成度 {completion}% · Supabase 云端存储</span><button className="dashboard-primary" type="submit" disabled={loading || saving}>{saving ? "正在保存…" : "保存个人档案"}</button></div>
       </form>
     </div>
   );
