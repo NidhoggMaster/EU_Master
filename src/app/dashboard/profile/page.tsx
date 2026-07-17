@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getRemoteProfile, saveRemoteProfile } from "@/lib/profile-api";
 import { applicantProfileSchema } from "@/lib/profile-schema";
+import { getProfile, saveProfile } from "@/lib/profile-client";
 import { emptyProfile, profileCompletion } from "@/lib/progress";
 import type { ApplicantProfile, Course, EducationRecord, Experience, TestScore } from "@/lib/types";
 
@@ -17,7 +17,7 @@ export default function ProfilePage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    getRemoteProfile()
+    getProfile()
       .then((value) => value && setProfile(value))
       .catch((reason) => setMessage(reason instanceof Error ? reason.message : "读取档案失败，请刷新重试。"))
       .finally(() => setLoading(false));
@@ -34,7 +34,7 @@ export default function ProfilePage() {
     setMessage("");
     try {
       const next = { ...profile, updatedAt: new Date().toISOString() };
-      const saved = await saveRemoteProfile(next);
+      const saved = await saveProfile(next);
       setProfile(saved);
       setMessage("个人档案已通过后端安全写入 Supabase。");
     } catch (reason) {

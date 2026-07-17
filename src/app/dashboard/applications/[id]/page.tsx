@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getApplication, getMaterials, getProgram, saveApplication } from "@/lib/db";
+import { getApplication, getMaterials, saveApplication } from "@/lib/db";
+import { getProgram } from "@/lib/catalog-client";
 import { applicationProgress } from "@/lib/progress";
 import { MATERIAL_TYPE_LABELS, type Application, type Material, type Program } from "@/lib/types";
 

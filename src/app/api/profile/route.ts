@@ -18,7 +18,7 @@ function response(body: object, status = 200) {
 function serverError(reason: unknown) {
   console.error("Profile API database operation failed", reason);
   const configurationError = reason instanceof Error
-    && reason.message.includes("SUPABASE_SESSION_POOLER_URL");
+    && reason.message.includes("SUPABASE_SESSION_POOL");
   return response({
     error: configurationError
       ? reason.message

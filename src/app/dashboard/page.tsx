@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { getApplications, getMaterials, getPrograms } from "@/lib/db";
-import { getRemoteProfile } from "@/lib/profile-api";
+import { getApplications, getMaterials } from "@/lib/db";
+import { getPrograms } from "@/lib/catalog-client";
+import { getProfile } from "@/lib/profile-client";
 import { applicationProgress, profileCompletion } from "@/lib/progress";
 import { useLocalQuery } from "@/lib/use-local-query";
 
 async function loadDashboard() {
   const [profile, programs, materials, applications] = await Promise.all([
-    getRemoteProfile(), getPrograms(), getMaterials(), getApplications(),
+    getProfile(), getPrograms(), getMaterials(), getApplications(),
   ]);
   return { profile, programs, materials, applications };
 }
@@ -44,7 +45,7 @@ export default function DashboardPage() {
         <div>
           <span className="dashboard-date">2027 秋季入学规划</span>
           <h1>申请工作台</h1>
-          <p>个人档案保存在 Supabase，项目、材料、任务和截止日期保存在当前设备。</p>
+          <p>项目与档案保存在私有数据库；材料文件和申请工作区留在当前设备。</p>
         </div>
         <Link className="dashboard-primary link-button" href={profilePercent ? "/dashboard/programs" : "/dashboard/profile"}>
           {profilePercent ? "查看项目目录" : "建立个人档案"}
@@ -52,7 +53,7 @@ export default function DashboardPage() {
       </div>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
-      {loading && <div className="notice">正在读取 Supabase 档案和本地申请数据…</div>}
+      {loading && <div className="notice">正在读取项目库与本地申请数据…</div>}
 
       <div className="summary-grid" aria-label="申请数据概览">
         {summaryCards.map((card) => (
@@ -102,7 +103,7 @@ export default function DashboardPage() {
       <section className="getting-started local-warning">
         <div className="getting-copy">
           <span className="getting-number">!</span>
-          <div><span className="panel-label">本地数据提醒</span><h2>清理浏览器数据会删除材料和申请，但不会删除 Supabase 档案</h2></div>
+          <div><span className="panel-label">混合存储提醒</span><h2>清理浏览器数据会删除材料文件和申请工作区</h2></div>
         </div>
         <Link href="/dashboard/settings">前往备份设置 →</Link>
       </section>
