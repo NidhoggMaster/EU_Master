@@ -316,3 +316,36 @@ button { font: inherit; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Simplified public homepage */
+.simple-home { min-height: 100vh; display: flex; flex-direction: column; background: #f8faf7; }
+.simple-header { position: relative; z-index: 10; border-bottom: 1px solid var(--line); background: rgba(248,250,247,.92); }
+.simple-nav { height: 74px; display: flex; align-items: center; justify-content: space-between; }
+.simple-hero { position: relative; overflow: hidden; display: grid; min-height: 500px; place-items: center; border-bottom: 1px solid var(--line); }
+.simple-shape { position: absolute; width: 390px; height: 390px; right: max(3vw, calc((100vw - 1180px) / 2)); border-radius: 50%; background: #e3f1ea; opacity: .82; }
+.simple-hero-inner { position: relative; z-index: 1; padding-block: 78px; }
+.simple-kicker { display: block; margin-bottom: 23px; color: var(--teal); font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.simple-hero h1 { max-width: 720px; margin: 0; font-size: clamp(48px, 7vw, 82px); line-height: 1.05; letter-spacing: -.06em; }
+.simple-hero p { margin: 24px 0 0; color: var(--muted); font-size: 18px; }
+.simple-cta { margin-top: 34px; }
+.simple-features { background: white; }
+.simple-feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.simple-feature { min-height: 190px; padding: 37px 34px; border-right: 1px solid var(--line); }
+.simple-feature:first-child { border-left: 1px solid var(--line); }
+.simple-feature > span { color: #7b9992; font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.simple-feature h2 { margin: 20px 0 9px; font-size: 20px; letter-spacing: -.03em; }
+.simple-feature p { margin: 0; color: #74827f; font-size: 12px; line-height: 1.7; }
+.simple-footer { margin-top: auto; border-top: 1px solid var(--line); background: white; }
+.simple-footer .site-shell { min-height: 72px; display: flex; align-items: center; justify-content: space-between; color: #82908d; font-size: 10px; }
+
+@media (max-width: 760px) {
+  .simple-nav { height: 66px; }
+  .simple-hero { min-height: 455px; }
+  .simple-shape { width: 300px; height: 300px; right: -125px; top: 70px; }
+  .simple-hero-inner { padding-block: 70px; }
+  .simple-hero h1 { max-width: 500px; font-size: clamp(46px, 14vw, 62px); }
+  .simple-hero p { max-width: 250px; font-size: 16px; line-height: 1.6; }
+  .simple-feature-grid { grid-template-columns: 1fr; }
+  .simple-feature, .simple-feature:first-child { min-height: 140px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .simple-feature:last-child { border-bottom: 0; }
+}
