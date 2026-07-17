@@ -27,6 +27,7 @@
 /.cache/
 /.turbo/
 /.swc/
+/.pnpm-store/
 
 # misc
 .DS_Store

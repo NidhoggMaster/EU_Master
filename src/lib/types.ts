@@ -59,6 +59,32 @@ export interface University {
   homepageUrl: string;
   catalogUrl: string;
   allowedHosts: string[];
+  campusName?: string;
+  campusArea?: string;
+  locationNotes?: string;
+  livingCostMonthlyMinEur?: number | null;
+  livingCostMonthlyMaxEur?: number | null;
+  livingCostSourceUrl?: string;
+  factsFetchedAt?: string;
+}
+
+export interface CoreCourse {
+  name: string;
+  tags: string[];
+  sourceUrl?: string;
+}
+
+export interface AdmissionCriterion {
+  id: string;
+  kind: "prerequisite" | "degree" | "gpa" | "experience" | "language" | "other";
+  title: string;
+  description: string;
+  required: boolean;
+  tags: string[];
+  minimum?: number;
+  testType?: string;
+  sourceUrl: string;
+  verificationState: "pending" | "confirmed" | "manual";
 }
 
 export interface ProgramRequirement {
@@ -91,11 +117,22 @@ export interface Program {
   intakes: string[];
   deadline: string;
   tuition: string;
+  tuitionEur: number | null;
+  tuitionAcademicYear: string;
   applicationFee: string;
+  applicationFeeEur: number | null;
   applicationPlatform: string;
   premaster: string;
   quota: string;
+  campusName: string;
+  city: string;
+  campusArea: string;
+  locationNotes: string;
+  coreCourses: CoreCourse[];
+  admissionCriteria: AdmissionCriterion[];
   requirements: ProgramRequirement[];
+  dataCompleteness: number;
+  status: "active" | "candidate" | "archived";
   lastFetchedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -223,6 +260,20 @@ export interface SourceSnapshot {
   contentHash: string;
   parserVersion: string;
   excerpts: string[];
+  provider?: "firecrawl" | "direct" | "seed";
+}
+
+export interface ProgramSource {
+  id: string;
+  programId: string;
+  sourceUrl: string;
+  sourceKind: string;
+  title: string;
+  provider: "firecrawl" | "direct" | "seed";
+  contentHash: string;
+  excerpts: string[];
+  verificationState: "pending" | "confirmed" | "rejected";
+  fetchedAt?: string;
 }
 
 export interface FieldChange {
@@ -253,6 +304,88 @@ export interface CatalogRefreshResult {
   reviewItems: Omit<FieldChange, "id" | "programId" | "status" | "createdAt">[];
   snapshot: Omit<SourceSnapshot, "id" | "programId">;
   warnings: string[];
+  provider?: "firecrawl" | "direct";
+}
+
+export interface ProgramDetail extends Program {
+  universities: University[];
+  sources: ProgramSource[];
+  pendingChanges: FieldChange[];
+}
+
+export interface ExchangeRate {
+  baseCurrency: "EUR";
+  quoteCurrency: "CNY";
+  effectiveDate: string;
+  rate: number;
+  sourceUrl: string;
+  fetchedAt: string;
+  stale: boolean;
+}
+
+export const MATCH_DIMENSIONS = ["courses", "degree", "gpa", "experience", "language", "materials"] as const;
+export type MatchDimension = (typeof MATCH_DIMENSIONS)[number];
+
+export interface MatchDimensionScore {
+  key: MatchDimension;
+  label: string;
+  weight: number;
+  score: number;
+  earned: number;
+  reasons: string[];
+  missingEvidence: string[];
+}
+
+export interface ProgramComparison {
+  program: ProgramDetail;
+  score: number;
+  dataCompleteness: number;
+  dimensions: MatchDimensionScore[];
+  hardRisks: string[];
+  requiredMaterials: MaterialType[];
+  readyMaterials: MaterialType[];
+  missingMaterials: MaterialType[];
+  tuitionEur: number | null;
+  livingCostAnnualMinEur: number | null;
+  livingCostAnnualMaxEur: number | null;
+  firstYearMinEur: number | null;
+  firstYearMaxEur: number | null;
+  firstYearMinCny: number | null;
+  firstYearMaxCny: number | null;
+  similarity: number;
+}
+
+export interface LocalCatalogRow {
+  id: string;
+  status: Program["status"];
+  universityIds: string[];
+  universities: string;
+  programName: string;
+  categories: string;
+  city: string;
+  campus: string;
+  location: string;
+  degreeType: string;
+  language: string;
+  duration: string;
+  ects: string;
+  coreCourses: string;
+  admissionCriteria: string;
+  requiredDocuments: string;
+  tuitionEur: number | null;
+  tuition: string;
+  deadline: string;
+  sourceUrl: string;
+  sourceCount: number;
+  dataCompleteness: number;
+  lastFetchedAt: string;
+  syncedAt: string;
+}
+
+export interface CompareResponse {
+  comparisons: ProgramComparison[];
+  exchangeRate: ExchangeRate;
+  disclaimer: string;
 }
 
 export interface BackupRecords {
@@ -264,4 +397,5 @@ export interface BackupRecords {
   applications: Application[];
   sourceSnapshots: SourceSnapshot[];
   fieldChanges: FieldChange[];
+  catalogTableRows?: LocalCatalogRow[];
 }

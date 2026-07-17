@@ -19,6 +19,16 @@ export const universities: University[] = [
   { id: "ou", name: "Open University of the Netherlands", shortName: "OU", city: "Heerlen", country: "NL", homepageUrl: "https://www.ou.nl/en", catalogUrl: "https://www.ou.nl/en/web/english/education", allowedHosts: ["ou.nl", "www.ou.nl"] },
 ];
 
+for (const university of universities) {
+  Object.assign(university, {
+    campusName: university.shortName,
+    campusArea: "",
+    locationNotes: "",
+    livingCostMonthlyMinEur: null,
+    livingCostMonthlyMaxEur: null,
+  });
+}
+
 function program(
   id: string,
   institutionIds: string[],
@@ -41,11 +51,22 @@ function program(
     intakes: [],
     deadline: "",
     tuition: "",
+    tuitionEur: null,
+    tuitionAcademicYear: "",
     applicationFee: "",
+    applicationFeeEur: null,
     applicationPlatform: "",
     premaster: "",
     quota: "",
+    campusName: "",
+    city: "",
+    campusArea: "",
+    locationNotes: "",
+    coreCourses: [],
+    admissionCriteria: [],
     requirements: [],
+    dataCompleteness: 0,
+    status: "active",
     createdAt: now,
     updatedAt: now,
     seeded: true,

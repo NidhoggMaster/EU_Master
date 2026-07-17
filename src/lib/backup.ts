@@ -21,6 +21,7 @@ const backupPayloadSchema = z.object({
     applications: z.array(z.unknown()),
     sourceSnapshots: z.array(z.unknown()),
     fieldChanges: z.array(z.unknown()),
+    catalogTableRows: z.array(z.unknown()).optional(),
   }),
   files: z.record(z.string(), z.object({ mimeType: z.string(), checksum: z.string() })),
 });
@@ -130,7 +131,7 @@ export async function inspectBackup(file: File, password?: string) {
     records,
     versions,
     summary: {
-      programs: records.programs.length,
+      programs: records.catalogTableRows?.length ?? 0,
       materials: records.materials.length,
       applications: records.applications.length,
       files: versions.length,

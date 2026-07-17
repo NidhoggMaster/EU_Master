@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getApplications, getMaterials, getPrograms, saveApplication } from "@/lib/db";
+import { deleteApplication, getApplications, getMaterials, saveApplication } from "@/lib/db";
+import { getPrograms } from "@/lib/catalog-client";
 import { applicationProgress } from "@/lib/progress";
 import type { Application, Material, Program } from "@/lib/types";
 import { useLocalQuery } from "@/lib/use-local-query";
@@ -17,6 +18,8 @@ const statusLabels: Record<Application["status"], string> = {
   planning: "规划中", preparing: "准备中", submitted: "已提交", offer: "已录取", rejected: "未录取", withdrawn: "已撤回",
 };
 
+const deletableStatuses = new Set<Application["status"]>(["planning", "preparing"]);
+
 export default function ApplicationsPage() {
   const router = useRouter();
   const { data, loading, error, reload } = useLocalQuery("applications", loadApplications, { applications: [] as Application[], programs: [] as Program[], materials: [] as Material[] });
@@ -24,6 +27,7 @@ export default function ApplicationsPage() {
   const [intake, setIntake] = useState("2027 September");
   const [deadline, setDeadline] = useState("");
   const [message, setMessage] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string>();
 
   useEffect(() => {
     const selected = new URLSearchParams(window.location.search).get("program");
@@ -64,9 +68,16 @@ export default function ApplicationsPage() {
     router.push(`/dashboard/applications/${application.id}`);
   }
 
+  async function removeApplication(application: Application) {
+    await deleteApplication(application.id);
+    setPendingDeleteId(undefined);
+    setMessage(`已删除“${application.programName}”的申请工作区。`);
+    reload();
+  }
+
   return (
     <div className="dashboard-content">
-      <header className="page-heading"><div><span className="dashboard-date">清单、任务与进度</span><h1>申请管理</h1><p>每份申请保留独立要求快照，不会被项目更新静默覆盖。</p></div><span className="count-badge">{data.applications.length} 份申请</span></header>
+      <header className="page-heading"><div><span className="dashboard-date">清单、任务与进度</span><h1>申请管理</h1><p>申请要求独立保存，项目更新不会覆盖。</p></div><span className="count-badge">{data.applications.length} 份申请</span></header>
       {(message || error) && <div className={`notice ${error ? "notice-error" : ""}`}>{error || message}</div>}
 
       <section className="create-application-panel">
@@ -84,7 +95,9 @@ export default function ApplicationsPage() {
           {data.applications.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((application) => {
             const progress = applicationProgress(application);
             const openTasks = application.tasks.filter((task) => !task.completed).length;
-            return <article key={application.id}><div className="application-main"><span className={`application-status status-${application.status}`}>{statusLabels[application.status]}</span><h2>{application.programName}</h2><p>{application.intake || "未设置批次"}{application.deadline ? ` · 截止 ${new Date(`${application.deadline}T00:00:00`).toLocaleDateString("zh-CN")}` : ""}</p></div><div className="application-progress"><strong>{progress}%</strong><div><span style={{ width: `${progress}%` }} /></div><small>{openTasks} 项任务待完成</small></div><Link href={`/dashboard/applications/${application.id}`}>打开工作区 →</Link></article>;
+            const canDelete = deletableStatuses.has(application.status);
+            const confirmingDelete = pendingDeleteId === application.id;
+            return <article key={application.id}><div className="application-main"><span className={`application-status status-${application.status}`}>{statusLabels[application.status]}</span><h2>{application.programName}</h2><p>{application.intake || "未设置批次"}{application.deadline ? ` · 截止 ${new Date(`${application.deadline}T00:00:00`).toLocaleDateString("zh-CN")}` : ""}</p></div><div className="application-progress"><strong>{progress}%</strong><div><span style={{ width: `${progress}%` }} /></div><small>{openTasks} 项任务待完成</small></div><div className="application-actions"><Link href={`/dashboard/applications/${application.id}`}>打开工作区 →</Link>{canDelete && (confirmingDelete ? <div className="application-delete-confirm" role="status"><span>删除此草稿？</span><button type="button" onClick={() => setPendingDeleteId(undefined)}>取消</button><button className="danger-link" type="button" onClick={() => removeApplication(application)}>确认删除</button></div> : <button className="danger-link" type="button" onClick={() => setPendingDeleteId(application.id)}>删除草稿</button>)}</div></article>;
           })}
         </div>
       ) : <div className="empty-state"><strong>还没有申请</strong><p>选择一个项目，建立要求清单和任务。</p><Link href="/dashboard/programs">先查看项目目录 →</Link></div>}

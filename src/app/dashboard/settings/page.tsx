@@ -91,7 +91,7 @@ export default function SettingsPage() {
   }
 
   async function handleRestore() {
-    if (!preview || !window.confirm("恢复会替换当前浏览器中的项目、材料和申请。Supabase 个人档案不会被替换。确定继续吗？")) return;
+    if (!preview || !window.confirm("恢复会替换当前浏览器中的材料文件和申请工作区。项目与个人档案不会被覆盖。确定继续吗？")) return;
     setWorking(true); setMessage("正在恢复备份，请不要关闭页面…");
     try {
       await restoreBackup(preview.records, preview.versions);
@@ -107,7 +107,7 @@ export default function SettingsPage() {
 
   return (
     <div className="dashboard-content content-narrow">
-      <header className="page-heading"><div><span className="dashboard-date">设备本地数据</span><h1>设置与备份</h1><p>管理浏览器存储，并导出可完整恢复的申请工作区。</p></div></header>
+      <header className="page-heading"><div><span className="dashboard-date">设备本地文件</span><h1>设置与备份</h1><p>管理本地材料与申请工作区；项目和个人档案由私有数据库保存。</p></div></header>
       {message && <div className="notice" role="status">{message}</div>}
 
       <section className="settings-card storage-card">
@@ -117,7 +117,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="settings-card">
-        <div className="panel-heading"><div><span className="panel-label">完整导出</span><h2>创建本地备份</h2></div><span className="zero-state-tag">包含材料文件</span></div>
+        <div className="panel-heading"><div><span className="panel-label">本地工作区导出</span><h2>创建本地备份</h2></div><span className="zero-state-tag">材料 + 申请</span></div>
         <div className="mode-switch"><button className={exportMode === "encrypted" ? "active" : ""} type="button" onClick={() => setExportMode("encrypted")}><strong>密码加密</strong><small>推荐，导出 .eumaster</small></button><button className={exportMode === "plain" ? "active" : ""} type="button" onClick={() => setExportMode("plain")}><strong>普通 ZIP</strong><small>不加密，需确认风险</small></button></div>
         {exportMode === "encrypted" && <div className="form-grid"><label>设置备份密码<input type="password" minLength={8} value={exportPassword} onChange={(event) => setExportPassword(event.target.value)} /></label><label>再次输入密码<input type="password" minLength={8} value={exportPasswordAgain} onChange={(event) => setExportPasswordAgain(event.target.value)} /></label></div>}
         <button className="button button-primary" type="button" disabled={working} onClick={handleExport}>{working ? "处理中…" : "生成并下载备份"}</button>
@@ -127,10 +127,10 @@ export default function SettingsPage() {
         <div className="panel-heading"><div><span className="panel-label">完整恢复</span><h2>校验并导入备份</h2></div><span className="zero-state-tag">先校验，后替换</span></div>
         <div className="form-grid"><label className="file-field">备份文件<input type="file" accept=".eumaster,.zip" onChange={(event) => { setImportFile(event.target.files?.[0]); setPreview(undefined); }} /><span>{importFile?.name || "选择 .eumaster 或 .zip"}</span></label><label>备份密码<input type="password" value={importPassword} placeholder="普通 ZIP 可留空" onChange={(event) => setImportPassword(event.target.value)} /></label></div>
         <button className="button button-outline" type="button" disabled={working} onClick={handleInspect}>校验备份</button>
-        {preview && <div className="backup-preview"><div><span>导出时间</span><strong>{new Date(preview.exportedAt).toLocaleString("zh-CN")}</strong></div><div><span>项目</span><strong>{preview.summary.programs}</strong></div><div><span>材料</span><strong>{preview.summary.materials}</strong></div><div><span>申请</span><strong>{preview.summary.applications}</strong></div><div><span>文件版本</span><strong>{preview.summary.files}</strong></div><button className="button button-primary" type="button" disabled={working} onClick={handleRestore}>确认替换当前数据</button></div>}
+        {preview && <div className="backup-preview"><div><span>导出时间</span><strong>{new Date(preview.exportedAt).toLocaleString("zh-CN")}</strong></div><div><span>项目表格快照</span><strong>{preview.summary.programs}</strong></div><div><span>材料</span><strong>{preview.summary.materials}</strong></div><div><span>申请</span><strong>{preview.summary.applications}</strong></div><div><span>文件版本</span><strong>{preview.summary.files}</strong></div><button className="button button-primary" type="button" disabled={working} onClick={handleRestore}>确认替换当前数据</button></div>}
       </section>
 
-      <div className="notice notice-warning">清理浏览器站点数据会删除所有本地内容。建议在每次重要修改后导出加密备份。</div>
+      <div className="notice notice-warning">清理浏览器站点数据会删除材料文件、版本和申请工作区，但不会删除 Supabase 中的项目目录与个人档案。</div>
     </div>
   );
 }

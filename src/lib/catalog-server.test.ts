@@ -1,9 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { discoverFromHtml, findSupportingUrls, parseProgramHtml, validateOfficialUrl } from "./catalog-server";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { discoverFromHtml, fetchOfficialPage, findSupportingUrls, parseProgramHtml, validateOfficialUrl } from "./catalog-server";
 import { getUniversity } from "./catalog-data";
 
 describe("catalog safety and parsing", () => {
   const tilburg = getUniversity("tilburg")!;
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.FIRECRAWL_API_KEY;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    process.env.FIRECRAWL_API_KEY = originalKey;
+    globalThis.euMasterRequestTimes?.clear();
+    globalThis.euMasterRobotsCache?.clear();
+    vi.restoreAllMocks();
+  });
 
   it("rejects non-official and non-https URLs", () => {
     expect(() => validateOfficialUrl("https://example.com/master", tilburg)).toThrow("官方域名");
@@ -29,7 +39,28 @@ describe("catalog safety and parsing", () => {
     const result = await parseProgramHtml(html, "https://www.utwente.nl/en/education/master/programmes/business-information-technology/");
     expect(result.automaticUpdates.some((item) => item.field === "duration" && item.proposedValue === "2 years")).toBe(true);
     expect(result.automaticUpdates.some((item) => item.field === "ects" && item.proposedValue === "120 ECTS")).toBe(true);
-    expect(result.reviewItems.some((item) => item.field === "requirements")).toBe(true);
+    expect(result.reviewItems.some((item) => item.field === "admissionCriteria")).toBe(true);
+  });
+
+  it("rejects navigation and error-page titles", async () => {
+    const result = await parseProgramHtml(
+      `<html><body><h1>Page not found</h1><main>${"Official programme details. ".repeat(12)}</main></body></html>`,
+      "https://www.uva.nl/en/programmes/masters/example.html",
+      "uva",
+    );
+    expect(result.automaticUpdates.some((item) => item.field === "name")).toBe(false);
+  });
+
+  it("does not mistake pre-master credits for master programme ECTS", async () => {
+    const result = await parseProgramHtml(
+      `<html><body><h1>Information Sciences</h1><main>
+        <p>This pre-master programme is worth 30 ECTS credits.</p>
+        <p>The master programme is a one year programme worth 60 ECTS.</p>
+      </main></body></html>`,
+      "https://vu.nl/en/education/master/information-sciences",
+      "vu",
+    );
+    expect(result.automaticUpdates.find((item) => item.field === "ects")?.proposedValue).toBe("60 ECTS");
   });
 
   it("limits supporting pages to official admissions and tuition links", () => {
@@ -39,5 +70,35 @@ describe("catalog safety and parsing", () => {
     const urls = findSupportingUrls(html, tilburg.catalogUrl, tilburg);
     expect(urls).toHaveLength(2);
     expect(urls.every((url) => url.includes("tilburguniversity.edu"))).toBe(true);
+  });
+
+  it("uses Firecrawl after the robots check", async () => {
+    process.env.FIRECRAWL_API_KEY = "test-key";
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response("User-agent: *\nAllow: /", { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: { html: "<main><h1>Official programme</h1></main>", metadata: { sourceURL: tilburg.catalogUrl } } }), { status: 200, headers: { "content-type": "application/json" } }));
+    const result = await fetchOfficialPage(new URL(tilburg.catalogUrl), tilburg);
+    expect(result.provider).toBe("firecrawl");
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to a compliant direct fetch on an ordinary Firecrawl failure", async () => {
+    process.env.FIRECRAWL_API_KEY = "test-key";
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response("User-agent: *\nAllow: /", { status: 200 }))
+      .mockResolvedValueOnce(new Response("unavailable", { status: 500 }))
+      .mockResolvedValueOnce(new Response("<html><main>Official programme</main></html>", { status: 200, headers: { "content-type": "text/html" } }));
+    const result = await fetchOfficialPage(new URL(tilburg.catalogUrl), tilburg);
+    expect(result.provider).toBe("direct");
+    expect(result.warning).toContain("Firecrawl");
+  });
+
+  it("does not bypass Firecrawl rate-limit responses", async () => {
+    process.env.FIRECRAWL_API_KEY = "test-key";
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response("User-agent: *\nAllow: /", { status: 200 }))
+      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }));
+    await expect(fetchOfficialPage(new URL(tilburg.catalogUrl), tilburg)).rejects.toMatchObject({ status: 429 });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 });
