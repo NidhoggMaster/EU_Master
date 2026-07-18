@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, parse as parsePath, relative, reso
 import { parse } from "csv-parse/sync";
 import { stringify } from "csv-stringify/sync";
 import { seededPrograms, universities as seededUniversities } from "@/lib/catalog-data";
+import { BASIC_MATERIAL_SEED_VERSION, defaultBasicMaterials } from "@/lib/default-materials";
 import type {
   ApplicantProfile,
   Application,
@@ -201,11 +202,11 @@ async function initializeStore() {
   const migrated = await migrateLegacyStore();
 
   const initialRows: Record<TableName, CsvRow[]> = {
-    meta: [{ key: "schemaVersion", value: "3" }, { key: "catalogMode", value: "local" }, { key: "migratedFromLegacy", value: String(migrated) }],
+    meta: [{ key: "schemaVersion", value: "3" }, { key: "catalogMode", value: "local" }, { key: "migratedFromLegacy", value: String(migrated) }, { key: "basicMaterialSeedVersion", value: BASIC_MATERIAL_SEED_VERSION }],
     profile: [],
     universities: seededUniversities.map(encodeUniversity),
     programs: seededPrograms.map(encodeProgram),
-    materials: [],
+    materials: defaultBasicMaterials.map(encodeMaterial),
     materialVersions: [],
     applications: [],
     sourceSnapshots: [],
@@ -218,8 +219,18 @@ async function initializeStore() {
   }
   const meta = await readFile(tablePath("meta"), "utf8");
   const metaRows = parse(meta, { bom: true, columns: true, skip_empty_lines: true }) as CsvRow[];
-  const nextMeta = metaRows.filter((row) => !["schemaVersion", "migratedFromLegacy"].includes(row.key));
-  nextMeta.push({ key: "schemaVersion", value: "3" }, { key: "migratedFromLegacy", value: String(migrated || metaRows.some((row) => row.key === "migratedFromLegacy" && row.value === "true")) });
+  const seedMarkerMissing = !metaRows.some((row) => row.key === "basicMaterialSeedVersion");
+  if (seedMarkerMissing) {
+    const materialInput = await readFile(tablePath("materials"), "utf8");
+    const materialRows = parse(materialInput, { bom: true, columns: true, skip_empty_lines: true }) as CsvRow[];
+    if (!materialRows.length) await writeRows("materials", defaultBasicMaterials.map(encodeMaterial));
+  }
+  const nextMeta = metaRows.filter((row) => !["schemaVersion", "migratedFromLegacy", "basicMaterialSeedVersion"].includes(row.key));
+  nextMeta.push(
+    { key: "schemaVersion", value: "3" },
+    { key: "migratedFromLegacy", value: String(migrated || metaRows.some((row) => row.key === "migratedFromLegacy" && row.value === "true")) },
+    { key: "basicMaterialSeedVersion", value: BASIC_MATERIAL_SEED_VERSION },
+  );
   await writeRows("meta", nextMeta);
   const changeInput = await readFile(tablePath("fieldChanges"), "utf8");
   const changeRows = parse(changeInput, { bom: true, columns: true, skip_empty_lines: true }) as CsvRow[];

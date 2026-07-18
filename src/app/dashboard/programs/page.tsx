@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ExternalLink, LayoutGrid, List, RefreshCw } from "lucide-react";
 import { addCandidate, getPrograms, getUniversities } from "@/lib/catalog-client";
+import { livingCostForProgram } from "@/lib/living-cost-data";
 import {
   CATEGORY_LABELS,
   PROGRAM_CATEGORIES,
@@ -275,8 +276,9 @@ export default function ProgramsPage() {
             const schools = program.institutionIds.map((id) => universityMap.get(id)).filter(Boolean) as University[];
             const school = schools[0];
             const score = scoreMap.get(program.id);
-            const livingMin = school?.livingCostMonthlyMinEur == null ? null : school.livingCostMonthlyMinEur * 12;
-            const livingMax = school?.livingCostMonthlyMaxEur == null ? null : school.livingCostMonthlyMaxEur * 12;
+            const livingCost = livingCostForProgram(program, schools);
+            const livingMin = livingCost ? livingCost.monthlyMinEur * 12 : null;
+            const livingMax = livingCost ? livingCost.monthlyMaxEur * 12 : null;
             const checked = selected.includes(program.id);
             return <article className={`catalog-program ${checked ? "selected" : ""}`} key={program.id}>
               <div className="catalog-program-select"><input aria-label={`比较 ${program.name}`} type="checkbox" checked={checked} onChange={() => toggleCompare(program.id)} /></div>

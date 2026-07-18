@@ -87,6 +87,26 @@ export async function getUniversity(id: string) {
   });
 }
 
+export async function updateUniversityFacts(university: University) {
+  return withDb(async (client) => {
+    const result = await client.query(`update private.universities
+      set campus_name=$2,campus_area=$3,location_notes=$4,living_cost_monthly_min_eur=$5,
+          living_cost_monthly_max_eur=$6,living_cost_source_url=$7,facts_fetched_at=$8,updated_at=now()
+      where id=$1 returning *`, [
+      university.id,
+      university.campusName ?? "",
+      university.campusArea ?? "",
+      university.locationNotes ?? "",
+      university.livingCostMonthlyMinEur ?? null,
+      university.livingCostMonthlyMaxEur ?? null,
+      university.livingCostSourceUrl ?? null,
+      university.factsFetchedAt ?? null,
+    ]);
+    if (result.rowCount !== 1) throw new Error(`Supabase 中找不到学校：${university.id}`);
+    return mapUniversity(result.rows[0]);
+  });
+}
+
 export async function listPrograms(filters: { universityId?: string; category?: ProgramCategory; status?: Program["status"] } = {}) {
   return withDb(async (client) => {
     const values: unknown[] = [];
@@ -140,16 +160,25 @@ export async function upsertCandidate(input: { id?: string; universityId: string
 
 export async function updateProgram(program: Program) {
   return withDb(async (client) => {
-    await client.query(`update private.programs set name=$2,categories=$3,source_url=$4,faculty=$5,degree_type=$6,language=$7,duration=$8,ects=$9,mode=$10,intakes=$11,deadline=$12,tuition=$13,tuition_eur=$14,tuition_academic_year=$15,application_fee=$16,application_fee_eur=$17,application_platform=$18,premaster=$19,quota=$20,campus_name=$21,city=$22,campus_area=$23,location_notes=$24,core_courses=$25,admission_criteria=$26,requirements=$27,data_completeness=$28,status=$29,last_fetched_at=$30,overview=$31,rankings=$32,career_outcomes=$33,application_dates=$34,test_requirements=$35,china_eligibility=$36,premaster_info=$37,application_links=$38,admission_probability_prior=$39,field_locks=$40,updated_at=now() where id=$1`, [
+    await client.query(`update private.programs set name=$2,categories=$3,source_url=$4,faculty=$5,degree_type=$6,language=$7,duration=$8,ects=$9,mode=$10,intakes=$11,deadline=$12,tuition=$13,tuition_eur=$14,tuition_academic_year=$15,application_fee=$16,application_fee_eur=$17,application_platform=$18,premaster=$19,quota=$20,campus_name=$21,city=$22,campus_area=$23,location_notes=$24,core_courses=$25,admission_criteria=$26,requirements=$27,data_completeness=$28,status=$29,last_fetched_at=$30,overview=$31,rankings=$32,career_outcomes=$33,application_dates=$34,test_requirements=$35,china_eligibility=$36,premaster_info=$37,application_links=$38,admission_probability_prior=$39,field_locks=$40,seeded=$41,updated_at=now() where id=$1`, [
       program.id, program.name, program.categories, program.sourceUrl, program.faculty, program.degreeType, program.language, program.duration, program.ects,
       program.mode, program.intakes, program.deadline, program.tuition, program.tuitionEur, program.tuitionAcademicYear, program.applicationFee,
       program.applicationFeeEur, program.applicationPlatform, program.premaster, program.quota, program.campusName, program.city, program.campusArea,
       program.locationNotes, JSON.stringify(program.coreCourses), JSON.stringify(program.admissionCriteria), JSON.stringify(program.requirements),
       program.dataCompleteness, program.status, program.lastFetchedAt ?? null, JSON.stringify(program.overview), JSON.stringify(program.rankings),
       JSON.stringify(program.careerOutcomes), JSON.stringify(program.applicationDates), JSON.stringify(program.testRequirements), JSON.stringify(program.chinaEligibility),
-      JSON.stringify(program.premasterInfo), JSON.stringify(program.applicationLinks), JSON.stringify(program.admissionProbabilityPrior), program.fieldLocks,
+      JSON.stringify(program.premasterInfo), JSON.stringify(program.applicationLinks), JSON.stringify(program.admissionProbabilityPrior), program.fieldLocks, program.seeded,
     ]);
     return detailWithClient(client, program.id);
+  });
+}
+
+export async function confirmProgramSeedSource(programId: string, sourceUrl: string, title: string, fetchedAt: string) {
+  return withDb(async (client) => {
+    const result = await client.query(`update private.program_sources
+      set title=$3,provider='seed',verification_state='confirmed',fetched_at=$4
+      where program_id=$1 and source_url=$2`, [programId, sourceUrl, title, fetchedAt]);
+    if (result.rowCount !== 1) throw new Error(`Supabase 中找不到项目来源：${programId}`);
   });
 }
 

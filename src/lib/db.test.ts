@@ -9,9 +9,9 @@ describe("local database and backup", () => {
     Object.defineProperty(globalThis, "crypto", { value: globalThis.crypto, configurable: true });
   });
 
-  it("seeds fourteen universities and thirteen sample programs", async () => {
+  it("seeds fourteen universities and twenty-eight sample programs", async () => {
     expect(await getUniversities()).toHaveLength(14);
-    expect(await getPrograms()).toHaveLength(13);
+    expect(await getPrograms()).toHaveLength(28);
   });
 
   it("stores file blobs with material metadata", async () => {

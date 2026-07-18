@@ -13,7 +13,7 @@ import { listLocalPrograms, updateLocalRankingData } from "./local-store";
 export async function applyQsRankingData() {
   const localPrograms = await listLocalPrograms({ status: "active" });
   const programRankings = programRankingUpdates(localPrograms);
-  if (Object.keys(programRankings).length !== QS_RANKED_PROGRAM_IDS.length) {
+  if (QS_RANKED_PROGRAM_IDS.some((id) => !programRankings[id])) {
     const present = new Set(Object.keys(programRankings));
     throw new Error(`本地目录缺少排名目标项目：${QS_RANKED_PROGRAM_IDS.filter((id) => !present.has(id)).join("、")}`);
   }

@@ -7,6 +7,7 @@ import { stringify } from "csv-stringify/sync";
 import { strToU8, zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { seededPrograms } from "../catalog-data";
+import { defaultBasicMaterials } from "../default-materials";
 import { decodeProfile, decodeProgram, encodeProfile, encodeProgram } from "./local-csv-codec";
 
 vi.mock("server-only", () => ({}));
@@ -60,6 +61,16 @@ describe("local CSV store", () => {
     expect(await store.getCatalogMode()).toBe("supabase");
     expect((await readdir(directory)).some((name) => name.endsWith(".tmp"))).toBe(false);
     expect(await readFile(join(directory, "meta.csv"), "utf8")).toContain("catalogMode,supabase");
+  });
+
+  it("seeds the basic checklist once without recreating deleted items", async () => {
+    const initial = await store.getLocalMaterials();
+    expect(initial).toHaveLength(defaultBasicMaterials.length);
+    await store.deleteLocalMaterial(initial[0].id);
+    globalThis.euMasterLocalStoreInit = undefined;
+    await store.ensureLocalStore();
+    expect(await store.getLocalMaterials()).toHaveLength(defaultBasicMaterials.length - 1);
+    expect(await store.getLocalMeta("basicMaterialSeedVersion")).toBe("1");
   });
 
   it("stores verified university living-cost facts through the atomic CSV writer", async () => {
@@ -122,7 +133,7 @@ describe("local CSV store", () => {
     };
     const bytes = zipSync({ "backup.json": strToU8(JSON.stringify(payload)) });
     await backup.restoreLocalBackup(bytes, undefined, true);
-    expect(await store.listLocalPrograms()).toHaveLength(13);
+    expect(await store.listLocalPrograms()).toHaveLength(28);
     expect(await store.listLocalUniversities()).toHaveLength(14);
   });
 
@@ -131,7 +142,7 @@ describe("local CSV store", () => {
     const bytes = await backup.createLocalBackup();
     const inspected = await backup.inspectLocalBackup(bytes);
     expect(inspected.schemaVersion).toBe(3);
-    expect(inspected.summary.materials).toBe(1);
+    expect(inspected.summary.materials).toBe(defaultBasicMaterials.length + 1);
   });
 
   it("copies a legacy local-data store into the new layout and keeps the source", async () => {
@@ -146,7 +157,7 @@ describe("local CSV store", () => {
       globalThis.euMasterLocalStoreInit = undefined;
       globalThis.euMasterLocalStoreQueue = undefined;
       await store.ensureLocalStore();
-      expect(await store.listLocalPrograms()).toHaveLength(13);
+      expect(await store.listLocalPrograms()).toHaveLength(28);
       expect(await readFile(join(legacy, "programs.csv"), "utf8")).toContain(seededPrograms[0].name);
       expect(await stat(join(directory, "Private_Data", "migrations", "legacy-local-data"))).toBeDefined();
       expect(await store.getLocalMeta("migratedFromLegacy")).toBe("true");

@@ -110,7 +110,7 @@ export default function ApplicationsPage() {
   }
 
   return <div className="dashboard-content applications-page">
-    <header className="page-heading"><div><span className="dashboard-date">项目要求快照 · 本机存储</span><h1>项目申请</h1><p>每份申请独立保存材料、任务、竞争力和准备度。</p></div><span className="count-badge">{data.applications.length} 份申请</span></header>
+    <header className="page-heading"><div><span className="dashboard-date">项目要求快照 · 本机存储</span><h1>项目申请</h1><p>每份申请独立保存材料、任务、背景适配度 <em className="ai-beta-tag">AI Beta</em> 和准备度；适配度为辅助判断。</p></div><span className="count-badge">{data.applications.length} 份申请</span></header>
     {(message || error) && <div className={`notice ${error ? "notice-error" : ""}`} role="status">{error || message}</div>}
 
     <section className="create-application-panel">
@@ -133,7 +133,7 @@ export default function ApplicationsPage() {
         const confirmingDelete = pendingDeleteId === application.id;
         return <article key={application.id}>
           <div className="application-main"><span className={`application-status status-${application.status}`}>{statusLabels[application.status]}</span><h2>{application.programName}</h2><p>{application.intake || "未设置批次"}{application.deadline ? ` · 截止 ${new Date(`${application.deadline}T00:00:00`).toLocaleDateString("zh-CN")}` : ""}</p></div>
-          <div className="application-metrics"><div><span>竞争力</span><strong>{score?.score == null ? "--" : Math.round(score.score)}</strong><small>{score ? `证据 ${score.evidenceCoverage}%` : "待确认"}</small></div><div><span>准备度</span><strong>{score?.readiness ?? progress}%</strong><small>{openTasks} 项任务待完成</small></div>{score?.probabilityMinimum != null && score.probabilityMaximum != null && <div><span>概率区间</span><strong>{score.probabilityMinimum}–{score.probabilityMaximum}%</strong><small>基于有来源先验</small></div>}</div>
+          <div className="application-metrics"><div><span>背景适配度 <em className="ai-beta-tag">AI Beta</em></span><strong>{score?.score == null ? "--" : Math.round(score.score)}</strong><small>{score ? `证据 ${score.evidenceCoverage}%` : "待确认"}</small></div><div><span>准备度</span><strong>{score?.readiness ?? progress}%</strong><small>{openTasks} 项任务待完成</small></div>{score?.probabilityMinimum != null && score.probabilityMaximum != null && <div><span>概率区间</span><strong>{score.probabilityMinimum}–{score.probabilityMaximum}%</strong><small>基于有来源先验</small></div>}</div>
           <div className="application-actions"><Link href={`/dashboard/applications/${application.id}`}>申请详情<ArrowRight size={15} aria-hidden="true" /></Link>{canDelete && (confirmingDelete ? <div className="application-delete-confirm" role="status"><span>删除草稿？</span><button type="button" onClick={() => setPendingDeleteId(undefined)}>取消</button><button className="danger-link" type="button" onClick={() => removeApplication(application)}>确认</button></div> : <button className="danger-link" type="button" title="删除草稿" onClick={() => setPendingDeleteId(application.id)}><Trash2 size={15} aria-hidden="true" /></button>)}</div>
         </article>;
       })}

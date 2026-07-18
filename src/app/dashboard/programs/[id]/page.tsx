@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, ExternalLink, LockKeyhole, RefreshCw } from "lucide-react";
 import { getProgram, saveProgram } from "@/lib/catalog-client";
+import { livingCostForProgram } from "@/lib/living-cost-data";
 import { ETS_GRE_COMPARISON_URL } from "@/lib/matching";
 import {
   CATEGORY_LABELS,
@@ -127,8 +128,9 @@ export default function ProgramDetailPage() {
 
   const university = program.universities[0];
   const tuitionCny = program.tuitionEur != null && exchangeRate ? Math.round(program.tuitionEur * exchangeRate.rate) : null;
-  const livingMin = university?.livingCostMonthlyMinEur == null ? null : university.livingCostMonthlyMinEur * 12;
-  const livingMax = university?.livingCostMonthlyMaxEur == null ? null : university.livingCostMonthlyMaxEur * 12;
+  const livingCost = livingCostForProgram(program, program.universities);
+  const livingMin = livingCost ? livingCost.monthlyMinEur * 12 : null;
+  const livingMax = livingCost ? livingCost.monthlyMaxEur * 12 : null;
   const overviewUrl = program.overview?.sourceUrl || program.applicationLinks.programUrl || program.sourceUrl;
   const eligibilityUrl = program.applicationLinks.eligibilityUrl || program.sourceUrl;
   const testRequirementUrl = program.testRequirements[0]?.sourceUrl || eligibilityUrl;
@@ -163,7 +165,7 @@ export default function ProgramDetailPage() {
     <section className="detail-facts">
       <div><span>学制 / 学分</span><strong>{[program.duration, program.ects].filter(Boolean).join(" · ") || "官网未披露"}</strong></div>
       <div><span>学费</span><strong>{program.applicationLinks.tuitionUrl ? <a href={program.applicationLinks.tuitionUrl} target="_blank" rel="noreferrer">{tuitionLabel(program, tuitionCny)}<ExternalLink size={11} aria-hidden="true" /></a> : tuitionLabel(program, tuitionCny)}</strong></div>
-      <div><span>生活费 / 年</span><strong>{livingMin == null ? "官网未披露" : `€${livingMin.toLocaleString("en-US")}–€${(livingMax ?? livingMin).toLocaleString("en-US")} · 约 ¥${exchangeRate ? Math.round(livingMin * exchangeRate.rate).toLocaleString("zh-CN") : "--"} 起`}</strong></div>
+      <div><span>生活费 / 年</span><strong>{livingMin == null ? "官网未披露" : livingCost?.sourceUrl ? <a href={livingCost.sourceUrl} target="_blank" rel="noreferrer">€{livingMin.toLocaleString("en-US")}–€{(livingMax ?? livingMin).toLocaleString("en-US")} · 约 ¥{exchangeRate ? Math.round(livingMin * exchangeRate.rate).toLocaleString("zh-CN") : "--"} 起<ExternalLink size={11} aria-hidden="true" /></a> : `€${livingMin.toLocaleString("en-US")}–€${(livingMax ?? livingMin).toLocaleString("en-US")} · 约 ¥${exchangeRate ? Math.round(livingMin * exchangeRate.rate).toLocaleString("zh-CN") : "--"} 起`}</strong></div>
       <div><span>入学时间</span><strong>{program.intakes.join("、") || "官网未披露"}</strong></div>
       <div><span>授课语言</span><strong>{program.language || "官网未披露"}</strong></div>
       <div><span>数据状态</span><strong>完整度 {program.dataCompleteness}% · {program.lastFetchedAt ? new Date(program.lastFetchedAt).toLocaleDateString("zh-CN") : "尚未抓取"}</strong></div>
@@ -226,7 +228,7 @@ export default function ProgramDetailPage() {
 
     <section className="dashboard-panel source-panel detail-section">
       <SectionHeading label="字段级溯源" title="官方来源与刷新记录" url={program.sourceUrl}><span className="zero-state-tag">完整度 {program.dataCompleteness}%</span></SectionHeading>
-      <div className="source-list">{program.sources.map((source) => <a href={source.sourceUrl} target="_blank" rel="noreferrer" key={source.id}><strong>{source.title || "官方项目页"}</strong><span>{source.provider} · {source.fetchedAt ? new Date(source.fetchedAt).toLocaleString("zh-CN") : "等待首次抓取"} · {source.verificationState}</span></a>)}{[...fieldSources.entries()].map(([url, label]) => <a href={url} target="_blank" rel="noreferrer" key={url}><strong>{label}</strong><span>字段级官网来源 · 精确页面</span></a>)}{university?.livingCostSourceUrl && <a href={university.livingCostSourceUrl} target="_blank" rel="noreferrer"><strong>生活费参考来源</strong><span>学校或公开留学信息页</span></a>}</div>
+      <div className="source-list">{program.sources.map((source) => <a href={source.sourceUrl} target="_blank" rel="noreferrer" key={source.id}><strong>{source.title || "官方项目页"}</strong><span>{source.provider} · {source.fetchedAt ? new Date(source.fetchedAt).toLocaleString("zh-CN") : "等待首次抓取"} · {source.verificationState}</span></a>)}{[...fieldSources.entries()].map(([url, label]) => <a href={url} target="_blank" rel="noreferrer" key={url}><strong>{label}</strong><span>字段级官网来源 · 精确页面</span></a>)}{livingCost?.sourceUrl && <a href={livingCost.sourceUrl} target="_blank" rel="noreferrer"><strong>生活费参考来源</strong><span>{livingCost.sourceLabel} · {livingCost.origin === "official" ? "官网区间" : "官网基准保守估算"} · {livingCost.asOf}</span></a>}</div>
       {program.pendingChanges.length > 0 && <p className="legacy-history-note">另有 {program.pendingChanges.length} 条旧版待审核记录，已归档为只读历史，不会写入当前项目事实。</p>}
     </section>
 
