@@ -5,6 +5,9 @@ nextEnv.loadEnvConfig(process.cwd());
 
 const ETS_GRE_COMPARISON_URL = "https://www.ets.org/gre/bschool-comparison-tool.html";
 const STUDIELINK_URL = "https://www.studielink.nl/";
+const TILBURG_TUITION_RATES_URL = "https://www.tilburguniversity.edu/sites/default/files/download/Instellingstarieven%20voor%20masteropleidingen%202026-2027.pdf";
+const TILBURG_TUITION_ROADMAP_URL = "https://landbot.pro/v3/H-3098416-R73QZFJEEIQN3TAL/index.html";
+const TILBURG_LIVING_COST_URL = "https://www.tilburguniversity.edu/education/masters-programs/tuition-fees-scholarships#:~:text=Estimated%20monthly%20costs,200%C2%A0per%20year";
 const FETCHED_AT = new Date().toISOString();
 const BACKGROUND_PLATFORMS = ["官网", "小红书", "Reddit", "B站", "YouTube", "知乎", "留学论坛/平台"];
 
@@ -741,22 +744,22 @@ const tuitionPatches = {
   "tilburg-im-strategy": {
     tuition: "€23,900（非欧盟）",
     tuitionEur: 23900,
-    tuitionUrl: "https://www.tilburguniversity.edu/sites/default/files/download/Instellingstarieven%20voor%20masteropleidingen%202026-2027.pdf",
+    tuitionUrl: TILBURG_TUITION_RATES_URL,
   },
   "tilburg-im-intelligence": {
     tuition: "€23,900（非欧盟）",
     tuitionEur: 23900,
-    tuitionUrl: "https://www.tilburguniversity.edu/sites/default/files/download/Instellingstarieven%20voor%20masteropleidingen%202026-2027.pdf",
+    tuitionUrl: TILBURG_TUITION_RATES_URL,
   },
   "tilburg-dss-business": {
-    tuition: "项目费率待官网确认",
-    tuitionEur: null,
-    tuitionUrl: "https://www.tilburguniversity.edu/students/administration/tuition-fees/rates",
+    tuition: "€23,900（非欧盟）",
+    tuitionEur: 23900,
+    tuitionUrl: TILBURG_TUITION_RATES_URL,
   },
   "jads-dsbe": {
-    tuition: "联合项目费率待官网确认",
-    tuitionEur: null,
-    tuitionUrl: "https://www.tilburguniversity.edu/students/administration/tuition-fees/rates",
+    tuition: "€23,900（非欧盟）",
+    tuitionEur: 23900,
+    tuitionUrl: TILBURG_TUITION_RATES_URL,
   },
   "vu-dbi": {
     tuition: "€24,830（非欧盟）",
@@ -791,14 +794,28 @@ const tuitionPatches = {
 };
 
 for (const [id, tuition] of Object.entries(tuitionPatches)) {
+  const isTilburg = id.startsWith("tilburg-") || id === "jads-dsbe";
   enrichments[id] = {
     ...enrichments[id],
     tuition: tuition.tuition,
     tuitionEur: tuition.tuitionEur,
     tuitionAcademicYear: "2026/27",
-    applicationLinks: { ...enrichments[id].applicationLinks, tuitionUrl: tuition.tuitionUrl },
+    applicationLinks: {
+      ...enrichments[id].applicationLinks,
+      tuitionUrl: tuition.tuitionUrl,
+      ...(isTilburg ? { tuitionCalculatorUrl: TILBURG_TUITION_ROADMAP_URL } : {}),
+    },
   };
 }
+
+const universityFacts = {
+  tilburg: {
+    livingCostMonthlyMinEur: 1000,
+    livingCostMonthlyMaxEur: 1200,
+    livingCostSourceUrl: TILBURG_LIVING_COST_URL,
+    factsFetchedAt: FETCHED_AT,
+  },
+};
 
 const chinaProfiles = {
   utwente: chinaBackground(
@@ -929,13 +946,32 @@ async function readJson(response) {
   return body;
 }
 
-export async function applyOfficialCatalog({ baseUrl = process.env.EU_MASTER_BASE_URL || "http://127.0.0.1:3000", fetchImpl = fetch, logger = console } = {}) {
+export async function applyOfficialCatalog({
+  baseUrl = process.env.EU_MASTER_BASE_URL || "http://127.0.0.1:3000",
+  fetchImpl = fetch,
+  logger = console,
+  programIds = Object.keys(enrichments),
+  universityIds = Object.keys(universityFacts),
+} = {}) {
   const origin = new URL(baseUrl.replace(/\/$/, ""));
   const health = await readJson(await fetchImpl(new URL("/api/health", origin), { cache: "no-store" }));
   if (health.status !== "ready" || health.storage?.catalogMode !== "local") throw new Error("请先以本地 CSV 模式启动网站，再运行官方项目资料导入。");
 
+  for (const id of universityIds) {
+    const patch = universityFacts[id];
+    if (!patch) throw new Error(`未知学校：${id}`);
+    await readJson(await fetchImpl(new URL(`/api/catalog/universities/${encodeURIComponent(id)}`, origin), {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    }));
+    logger.log(`[catalog:official] ${id}: 生活费 €${patch.livingCostMonthlyMinEur}–€${patch.livingCostMonthlyMaxEur} / 月`);
+  }
+
   const results = [];
-  for (const [id, patch] of Object.entries(enrichments)) {
+  for (const id of programIds) {
+    const patch = enrichments[id];
+    if (!patch) throw new Error(`未知项目：${id}`);
     const current = await readJson(await fetchImpl(new URL(`/api/catalog/programs/${encodeURIComponent(id)}`, origin), { cache: "no-store" }));
     const stored = { ...current };
     delete stored.universities;

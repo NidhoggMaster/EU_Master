@@ -100,6 +100,8 @@ pnpm catalog:official
 
 基线中的学费和申请日期优先采用 2026/27：目录只显示短金额/日期，原文与精确链接保留在详情来源中。无法从当前官方费率表可靠确认的项目会明确显示“待官网确认”，不会用学校通用费率冒充项目金额。
 
+Tilburg 2026/27 数据同时保留官网费率表和 [Tuition Fee Roadmap](https://landbot.pro/v3/H-3098416-R73QZFJEEIQN3TAL/index.html) 入口。Information Management、Data Science and Society、Data Science in Business and Entrepreneurship 的机构学费为 €23,900；学校生活费参考为每月 €1,000–€1,200，详情页会换算成年区间。
+
 “双非 / 院校名单”分开保存官网规则与社区参考。官网硬条件优先；小红书、Reddit、B站、YouTube、知乎及留学论坛/平台只用于形成带证据等级的参考结论。界面会列出已检索平台和可复核链接，项目外或较旧案例不会被当成录取门槛或概率。
 
 重新抓取 13 个种子项目：

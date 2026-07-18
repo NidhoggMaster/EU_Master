@@ -104,6 +104,7 @@ scripts/apply-qs-rankings-2027.mjs          本地与 Supabase 的 QS 2027/2026 
 
 - 学费和日期优先使用 2026/27 精确值，列表与详情首屏只显示短金额/日期；长原文留在来源事实。项目费率无法可靠确认时必须标为待确认，不能用学校通用费率冒充项目金额。
 - 排名基线使用 QS 2027 学校总榜和 QS 2026 最接近项目方向的学科榜。13 所入榜学校的总榜保存在本地学校 CSV，同时复制到对应项目 `rankings`；相关学科榜保存在项目 `rankings` 并在本地与 Supabase 同步。联合项目分别标明合作院校学科底盘，不声称存在项目独立排名；手工确认后锁定 `rankings`，自动刷新不得覆盖。
+- Tilburg 2026/27 项目费率以官网费率表为依据，并保留官方 Tuition Fee Roadmap（Landbot）供后续个案复核；Information Management、Data Science and Society、Data Science in Business and Entrepreneurship 当前机构学费均为 €23,900。Tilburg 生活费按官网 €1,000–€1,200/月保存。
 - 中国院校背景必须区分官网硬规则与社区参考。小红书、Reddit、B站、YouTube、知乎和留学平台样本保存检索范围、链接、项目相关性与证据等级；个案只能证明“曾有样本”，不能生成硬门槛或概率。
 
 ## 8. 项目、申请与材料

@@ -145,6 +145,7 @@ export default function ProgramDetailPage() {
   addFieldSource(program.applicationLinks.careersUrl, "就业页");
   addFieldSource(program.applicationLinks.premasterUrl, "Pre-master 页");
   addFieldSource(program.applicationLinks.tuitionUrl, "2026/27 学费表");
+  addFieldSource(program.applicationLinks.tuitionCalculatorUrl, "2026/27 学费计算器");
   program.admissionCriteria.forEach((item) => addFieldSource(item.sourceUrl, "申请资格与先修课"));
   program.requirements.forEach((item) => addFieldSource(item.sourceUrl, "申请材料来源"));
   program.applicationDates.forEach((item) => addFieldSource(item.sourceUrl, "申请日期来源"));
