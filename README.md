@@ -19,6 +19,16 @@
 
 需要 Node.js 20 或更高版本、pnpm，以及 Supabase Session Pool 连接串。
 
+macOS 可以直接双击 `start-website.command`。它会自动定位 Node/pnpm、安装缺失依赖、必要时创建 `.env.local`、启动开发服务并打开浏览器。保持弹出的终端窗口打开；按 `Ctrl-C` 可停止网站。
+
+也可以在终端运行同一个入口：
+
+```bash
+./start-website.command
+```
+
+手动启动流程如下：
+
 ```bash
 pnpm install
 cp .env.example .env.local
