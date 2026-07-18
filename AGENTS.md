@@ -60,8 +60,10 @@ src/lib/server/score-service.ts             目录竞争力与版本化快照
 src/lib/server/application-score-service.ts 申请评分、准备度与概率门槛
 src/lib/server/scoring-settings.ts          本机评分权重配置
 src/lib/db.ts                               旧 IndexedDB 读取和迁移兼容
-scripts/seed-catalog.mjs                    当前模式 13 项目逐一刷新脚本
+scripts/seed-catalog.mjs                    当前模式 28 项目逐一刷新脚本
 scripts/apply-official-catalog-2026.mjs     13 项目 2026/27 官方深层页面基线导入
+scripts/apply-catalog-expansion-2027.mjs    15 个新增项目与城市生活费的本地 / Supabase 同步
+src/lib/living-cost-data.ts                 按项目城市优先解析的生活费来源与保守区间
 scripts/apply-qs-rankings-2027.mjs          本地与 Supabase 的 QS 2027/2026 排名同步入口
 ```
 
@@ -70,6 +72,7 @@ scripts/apply-qs-rankings-2027.mjs          本地与 Supabase 的 QS 2027/2026 
 - `Private_Data/` 按 `personal/`、`catalog/`、`applications/` 分组；`material_center/` 保存材料清单、版本索引和实际文件。
 - `meta.csv` 保存 schemaVersion 3、`catalogMode`、评分权重、迁移标记、汇率缓存和抓取诊断。
 - 14 所学校始终从本地 `universities.csv` 读取；Supabase 故障不能让学校下拉为空。
+- 项目种子共 28 个；13 个原始方向有 QS 2026 学科基线，全部项目继承合作学校 QS 2027 总榜。生活费优先按 `Program.city`，再回退学校城市。
 - 数组和嵌套对象使用 JSON CSV 列。不要手写 CSV 转义，必须使用正式库和对应 codec。
 - 写入使用进程串行队列、同目录临时文件、`fsync` 和原子 `rename`。新增写路径必须沿用该机制。
 - 数据目录和子目录权限为 `0700`，CSV/材料文件为 `0600`。CSV 是明文，不要声称其已加密。
@@ -112,6 +115,8 @@ scripts/apply-qs-rankings-2027.mjs          本地与 Supabase 的 QS 2027/2026 
 - `Program.requirements` 是项目当前结构化要求；创建申请时复制为 `ApplicationRequirementSnapshot`，不能保留实时引用。
 - 项目刷新不能静默覆盖已有申请快照。“同步要求”只追加新要求，不修改或删除旧快照。
 - 材料是“清单项 + 可选文件版本”；`prepared` 勾选与文件是否存在相互独立，支持基本材料和项目特需材料。
+- 空材料仓库首次启动会一次性建立 10 项未准备、无文件的基本清单；`basicMaterialSeedVersion` 防止用户删除后被自动重建。
+- 个人背景适配分析只出现在申请界面并标记 `AI Beta`；项目目录不能保存针对个人的适配结论。
 - 创建申请时可关联同类型且已准备的基本/本项目材料，并为未满足必需要求生成任务。
 - 申请进度只计算必需要求；没有必需要求时为 0%。档案完成度按七个结构化分区等权计算。
 - `Program.deadline` 可是官网原始文本，`Application.deadline` 是 `YYYY-MM-DD`，不要混用。

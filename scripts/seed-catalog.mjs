@@ -3,7 +3,7 @@ import nextEnv from "@next/env";
 
 nextEnv.loadEnvConfig(process.cwd());
 
-const DEFAULT_EXPECTED_PROGRAMS = 13;
+const DEFAULT_EXPECTED_PROGRAMS = 28;
 const DEFAULT_DELAY_MS = 6_000;
 const DEFAULT_RETRY_DELAYS_MS = [15_000, 30_000];
 const REQUEST_TIMEOUT_MS = 75_000;

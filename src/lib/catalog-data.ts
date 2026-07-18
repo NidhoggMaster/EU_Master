@@ -1,12 +1,12 @@
 import type { Program, ProgramCategory, University } from "./types";
+import { catalogExpansionPrograms } from "./catalog-expansion-data";
+import { livingCostForCity } from "./living-cost-data";
 import { rankingsForProgram, universityRankingsFor } from "./qs-ranking-data";
 
 const now = "2026-07-19T00:00:00.000Z";
-const now = "2026-07-17T00:00:00.000Z";
-const TILBURG_LIVING_COST_URL = "https://www.tilburguniversity.edu/education/masters-programs/tuition-fees-scholarships#:~:text=Estimated%20monthly%20costs,200%C2%A0per%20year";
 
 export const universities: University[] = [
-  { id: "uva", name: "University of Amsterdam", shortName: "UvA", city: "Amsterdam", country: "NL", homepageUrl: "https://www.uva.nl/en", catalogUrl: "https://www.uva.nl/en/education/master-s/master-s-programmes/masters-programmes.html", allowedHosts: ["uva.nl", "www.uva.nl"] },
+  { id: "uva", name: "University of Amsterdam", shortName: "UvA", city: "Amsterdam", country: "NL", homepageUrl: "https://www.uva.nl/en", catalogUrl: "https://www.uva.nl/en/education/master-s/master-s-programmes/masters-programmes.html", allowedHosts: ["uva.nl", "www.uva.nl", "abs.uva.nl"] },
   { id: "vu", name: "Vrije Universiteit Amsterdam", shortName: "VU", city: "Amsterdam", country: "NL", homepageUrl: "https://vu.nl/en", catalogUrl: "https://vu.nl/en/education/master", allowedHosts: ["vu.nl", "www.vu.nl"] },
   { id: "tudelft", name: "Delft University of Technology", shortName: "TU Delft", city: "Delft", country: "NL", homepageUrl: "https://www.tudelft.nl/en", catalogUrl: "https://www.tudelft.nl/en/education/programmes/masters", allowedHosts: ["tudelft.nl", "www.tudelft.nl"] },
   { id: "tue", name: "Eindhoven University of Technology", shortName: "TU/e", city: "Eindhoven", country: "NL", homepageUrl: "https://www.tue.nl/en", catalogUrl: "https://www.tue.nl/en/education/graduate-school/master-programs", allowedHosts: ["tue.nl", "www.tue.nl"] },
@@ -23,22 +23,18 @@ export const universities: University[] = [
 ];
 
 for (const university of universities) {
+  const livingCost = livingCostForCity(university.city);
   Object.assign(university, {
     campusName: university.shortName,
     campusArea: "",
     locationNotes: "",
-    livingCostMonthlyMinEur: null,
-    livingCostMonthlyMaxEur: null,
+    livingCostMonthlyMinEur: livingCost?.monthlyMinEur ?? null,
+    livingCostMonthlyMaxEur: livingCost?.monthlyMaxEur ?? null,
+    livingCostSourceUrl: livingCost?.sourceUrl,
+    factsFetchedAt: livingCost ? `${livingCost.asOf}T00:00:00.000Z` : undefined,
     rankings: universityRankingsFor(university.id),
   });
 }
-
-Object.assign(universities.find((university) => university.id === "tilburg")!, {
-  livingCostMonthlyMinEur: 1000,
-  livingCostMonthlyMaxEur: 1200,
-  livingCostSourceUrl: TILBURG_LIVING_COST_URL,
-  factsFetchedAt: "2026-07-19T00:00:00.000Z",
-});
 
 function program(
   id: string,
@@ -46,9 +42,10 @@ function program(
   name: string,
   categories: ProgramCategory[],
   sourceUrl: string,
+  patch: Partial<Program> = {},
 ): Program {
   const rankings = rankingsForProgram({ id, institutionIds });
-  return {
+  const base: Program = {
     id,
     institutionIds,
     name,
@@ -101,6 +98,17 @@ function program(
     admissionProbabilityPrior: null,
     fieldLocks: rankings.length ? ["rankings"] : [],
   };
+  const merged = { ...base, ...patch, rankings };
+  const completenessFacts = [
+    merged.overview, merged.faculty, merged.degreeType, merged.duration, merged.ects,
+    merged.intakes.length, merged.tuition, merged.city, merged.coreCourses.length,
+    merged.admissionCriteria.length || merged.requirements.length, merged.applicationLinks.programUrl,
+  ];
+  return {
+    ...merged,
+    dataCompleteness: patch.dataCompleteness ?? Math.round(completenessFacts.filter(Boolean).length / completenessFacts.length * 100),
+    fieldLocks: [...new Set([...(patch.fieldLocks ?? []), ...(rankings.length ? ["rankings"] : [])])],
+  };
 }
 
 export const seededPrograms: Program[] = [
@@ -117,6 +125,14 @@ export const seededPrograms: Program[] = [
   program("uu-bi", ["uu"], "Business Informatics", ["business", "information", "computer"], "https://www.uu.nl/en/masters/business-informatics"),
   program("jads-dsbe", ["tilburg", "tue"], "Data Science in Business and Entrepreneurship", ["business", "data", "computer"], "https://www.tilburguniversity.edu/education/masters-programs/data-science-business-entrepreneurship"),
   program("maastricht-dbe", ["maastricht"], "Digital Business and Economics", ["business", "information"], "https://www.maastrichtuniversity.nl/education/master/programmes/digital-business-and-economics"),
+  ...catalogExpansionPrograms.map((patch) => program(
+    patch.id,
+    patch.institutionIds,
+    patch.name,
+    patch.categories,
+    patch.sourceUrl,
+    patch,
+  )),
 ];
 
 export const categoryKeywords: Record<ProgramCategory, string[]> = {

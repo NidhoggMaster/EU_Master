@@ -28,5 +28,7 @@ export function universityRankingUpdates(): Record<string, RankingFact[]> {
 }
 
 export function programRankingUpdates(programs: Array<Pick<Program, "id" | "institutionIds">>): Record<string, RankingFact[]> {
-  return Object.fromEntries(programs.filter((program) => programSubjectRankings[program.id]).map((program) => [program.id, rankingsForProgram(program)]));
+  return Object.fromEntries(programs
+    .map((program) => [program.id, rankingsForProgram(program)] as const)
+    .filter(([, rankings]) => rankings.length > 0));
 }

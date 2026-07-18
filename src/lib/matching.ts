@@ -9,6 +9,7 @@ import type {
   RequirementMatchOverride,
 } from "./types";
 import { eurToCny } from "./exchange-rates";
+import { livingCostForProgram } from "./living-cost-data";
 
 export const ETS_GRE_COMPARISON_URL = "https://www.ets.org/gre/bschool-comparison-tool.html";
 export const CATALOG_SCORE_WEIGHTS: Record<MatchDimension, number> = {
@@ -225,9 +226,9 @@ export function compareProgram(
   if ((program.testRequirements.some((item) => item.required) || verified.some((item) => item.kind === "language" && item.required)) && testScore.known && testScore.score < 100) hardRisks.push("语言或标准化考试条件未满足");
   const aggregate = weightedGeometricScore(dimensions);
   const probability = probabilityInterval(program, aggregate.score, hardRisks);
-  const university = program.universities[0];
-  const livingMin = university?.livingCostMonthlyMinEur == null ? null : university.livingCostMonthlyMinEur * 12;
-  const livingMax = university?.livingCostMonthlyMaxEur == null ? null : university.livingCostMonthlyMaxEur * 12;
+  const livingCost = livingCostForProgram(program, program.universities);
+  const livingMin = livingCost ? livingCost.monthlyMinEur * 12 : null;
+  const livingMax = livingCost ? livingCost.monthlyMaxEur * 12 : null;
   const firstYearMin = program.tuitionEur == null || livingMin == null ? null : program.tuitionEur + livingMin + (program.applicationFeeEur ?? 0);
   const firstYearMax = program.tuitionEur == null || livingMax == null ? null : program.tuitionEur + livingMax + (program.applicationFeeEur ?? 0);
   return {

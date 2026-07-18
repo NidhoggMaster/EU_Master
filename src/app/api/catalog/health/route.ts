@@ -4,7 +4,7 @@ import { withDb } from "@/lib/server/postgres";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const EXPECTED_SEEDED_PROGRAMS = 13;
+const EXPECTED_SEEDED_PROGRAMS = 28;
 
 export async function GET() {
   const firecrawlConfigured = Boolean(process.env.FIRECRAWL_API_KEY?.trim());
