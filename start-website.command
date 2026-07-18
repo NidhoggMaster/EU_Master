@@ -1,6 +1,7 @@
 #!/bin/zsh
 
 set -u
+set -o pipefail
 
 APP_NAME="EU Master Application Manager"
 ROOT_DIR="${0:A:h}"
@@ -10,6 +11,8 @@ RUN_MODE="production"
 [[ "${1:-}" == "--dev" ]] && RUN_MODE="development"
 RUN_LABEL="生产"
 [[ "$RUN_MODE" == "development" ]] && RUN_LABEL="开发"
+LOG_DIR="$ROOT_DIR/.logs"
+LOG_FILE="$LOG_DIR/website-$(date +%Y%m%d).log"
 
 function fail() {
   print ""
@@ -90,8 +93,11 @@ function open_when_ready() {
 }
 
 cd "$ROOT_DIR" || fail "无法进入项目目录。"
+mkdir -p "$LOG_DIR" || fail "无法创建日志目录。"
+chmod 700 "$LOG_DIR" 2>/dev/null || true
 print "$APP_NAME"
 print "项目目录：$ROOT_DIR"
+print "运行日志：$LOG_FILE"
 
 ensure_node
 typeset -a PNPM_CMD
@@ -127,15 +133,16 @@ export EU_MASTER_BASE_URL="$SITE_URL"
 print ""
 print "正在启动${RUN_LABEL}服务：$SITE_URL"
 print "浏览器会在健康检查通过后自动打开；按 Ctrl-C 停止网站。"
+print "首次健康检查会迁移并校验 Private_Data 与 material_center；旧 local-data 不会删除。"
 print ""
 
 open_when_ready &
 if [[ "$RUN_MODE" == "development" ]]; then
-  "${PNPM_CMD[@]}" exec next dev -H 127.0.0.1 -p "$SELECTED_PORT"
+  "${PNPM_CMD[@]}" exec next dev -H 127.0.0.1 -p "$SELECTED_PORT" 2>&1 | tee -a "$LOG_FILE"
 else
-  "${PNPM_CMD[@]}" exec next start -H 127.0.0.1 -p "$SELECTED_PORT"
+  "${PNPM_CMD[@]}" exec next start -H 127.0.0.1 -p "$SELECTED_PORT" 2>&1 | tee -a "$LOG_FILE"
 fi
-exit_code=$?
+exit_code=${pipestatus[1]}
 
 print ""
 print "网站已停止，退出码：$exit_code"

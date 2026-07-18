@@ -52,6 +52,9 @@ yarn-error.log*
 /backups/
 /uploads/
 /local-data/
+/Private_Data/
+/material_center/
+/.logs/
 
 # vercel
 .vercel

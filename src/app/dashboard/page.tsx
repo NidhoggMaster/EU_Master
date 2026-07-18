@@ -22,7 +22,7 @@ export default function DashboardPage() {
     applications: [],
   });
   const profilePercent = profileCompletion(data.profile);
-  const readyMaterials = data.materials.filter((item) => item.status === "ready").length;
+  const readyMaterials = data.materials.filter((item) => item.prepared || item.status === "ready").length;
   const activeApplications = data.applications.filter((item) => ["planning", "preparing"].includes(item.status));
   const pendingTasks = data.applications.flatMap((item) => item.tasks).filter((task) => !task.completed).length;
   const averageApplicationProgress = activeApplications.length
@@ -45,9 +45,9 @@ export default function DashboardPage() {
         <div>
           <span className="dashboard-date">2027 秋季入学规划</span>
           <h1>申请工作台</h1>
-          <p>项目与档案保存在私有数据库；材料文件和申请工作区留在当前设备。</p>
+          <p>档案、材料和申请保存在本机；项目目录可在本地 CSV 与 Supabase 间切换。</p>
         </div>
-        <Link className="dashboard-primary link-button" href={profilePercent ? "/dashboard/programs" : "/dashboard/profile"}>
+        <Link className="dashboard-primary link-button" href={profilePercent ? "/dashboard/programs" : "/dashboard/personal/profile"}>
           {profilePercent ? "查看项目目录" : "建立个人档案"}
         </Link>
       </div>
@@ -75,9 +75,9 @@ export default function DashboardPage() {
             <span style={{ width: `${Math.max(2, averageApplicationProgress)}%` }} />
           </div>
           <div className="action-list">
-            <Link href="/dashboard/profile"><span>01</span><strong>完善个人档案</strong><small>{profilePercent}%</small></Link>
+            <Link href="/dashboard/personal/profile"><span>01</span><strong>完善个人档案</strong><small>{profilePercent}%</small></Link>
             <Link href="/dashboard/programs"><span>02</span><strong>筛选和更新项目</strong><small>{data.programs.length} 个</small></Link>
-            <Link href="/dashboard/materials"><span>03</span><strong>整理申请材料</strong><small>{readyMaterials} 份可用</small></Link>
+            <Link href="/dashboard/personal/materials"><span>03</span><strong>整理申请材料</strong><small>{readyMaterials} 份可用</small></Link>
             <Link href="/dashboard/applications"><span>04</span><strong>跟踪申请任务</strong><small>{pendingTasks} 项待办</small></Link>
           </div>
         </section>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
       <section className="getting-started local-warning">
         <div className="getting-copy">
           <span className="getting-number">!</span>
-          <div><span className="panel-label">混合存储提醒</span><h2>清理浏览器数据会删除材料文件和申请工作区</h2></div>
+          <div><span className="panel-label">本地数据提醒</span><h2>Private_Data 与 material_center 不受浏览器缓存清理影响</h2></div>
         </div>
         <Link href="/dashboard/settings">前往备份设置 →</Link>
       </section>

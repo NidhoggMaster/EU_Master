@@ -10,12 +10,13 @@ const ENCRYPTION_VERSION = 1;
 const PBKDF2_ITERATIONS = 310_000;
 
 const payloadSchema = z.object({
-  schemaVersion: z.union([z.literal(1), z.literal(2)]),
+  schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   exportedAt: z.string().datetime(),
   records: z.object({
     profile: z.unknown().optional(), universities: z.array(z.unknown()), programs: z.array(z.unknown()), materials: z.array(z.unknown()),
     materialVersions: z.array(z.unknown()), applications: z.array(z.unknown()), sourceSnapshots: z.array(z.unknown()),
-    fieldChanges: z.array(z.unknown()), catalogTableRows: z.array(z.unknown()).optional(),
+    fieldChanges: z.array(z.unknown()), scoreSnapshots: z.array(z.unknown()).optional(), matchOverrides: z.array(z.unknown()).optional(),
+    catalogTableRows: z.array(z.unknown()).optional(),
   }),
   files: z.record(z.string(), z.object({ mimeType: z.string(), checksum: z.string().regex(/^[a-f0-9]{64}$/) })),
 });
@@ -71,7 +72,7 @@ export async function createLocalBackup(password?: string) {
     archive[`files/${version.id}`] = bytes;
     files[version.id] = { mimeType: version.mimeType, checksum: await checksum(bytes) };
   }
-  archive["backup.json"] = strToU8(JSON.stringify({ schemaVersion: 2, exportedAt: new Date().toISOString(), records, files }));
+  archive["backup.json"] = strToU8(JSON.stringify({ schemaVersion: 3, exportedAt: new Date().toISOString(), records, files }));
   const zipped = zipSync(archive, { level: 6 });
   return password ? encrypt(zipped, password) : zipped;
 }
@@ -119,6 +120,6 @@ export async function inspectLocalBackup(input: Uint8Array, password?: string) {
 
 export async function restoreLocalBackup(input: Uint8Array, password: string | undefined, replace: boolean) {
   const inspected = await inspectLocalBackup(input, password);
-  const imported = await importLocalBackupRecords(inspected.records, inspected.versions, replace && inspected.schemaVersion === 2);
+  const imported = await importLocalBackupRecords(inspected.records, inspected.versions, replace && inspected.schemaVersion >= 2);
   return { imported, summary: inspected.summary };
 }

@@ -8,7 +8,8 @@
     "start": "next start -H 127.0.0.1",
     "lint": "eslint",
     "test": "vitest run",
-    "catalog:seed": "node scripts/seed-catalog.mjs"
+    "catalog:seed": "node scripts/seed-catalog.mjs",
+    "catalog:official": "node scripts/apply-official-catalog-2026.mjs"
   },
   "dependencies": {
     "@next/env": "16.2.10",

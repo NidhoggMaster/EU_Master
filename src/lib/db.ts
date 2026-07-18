@@ -198,6 +198,12 @@ export async function createMaterial(title: string, type: Material["type"], stat
     currentVersionId: versionId,
     createdAt: timestamp,
     updatedAt: timestamp,
+    scope: "basic",
+    programId: "",
+    requirementId: "",
+    prepared: status === "ready",
+    notes: "",
+    archived: false,
   };
   const version: MaterialVersion = {
     id: versionId,

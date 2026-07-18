@@ -66,12 +66,117 @@ export interface University {
   livingCostMonthlyMaxEur?: number | null;
   livingCostSourceUrl?: string;
   factsFetchedAt?: string;
+  rankings?: RankingFact[];
+}
+
+export type FactOrigin = "official" | "manual" | "estimated";
+
+export interface FactSource {
+  sourceUrl: string;
+  sourceTitle?: string;
+  originalText: string;
+  summaryZh: string;
+  fetchedAt?: string;
+  origin: FactOrigin;
+  locked?: boolean;
+}
+
+export interface RankingFact extends FactSource {
+  id: string;
+  scope: "university" | "subject" | "program";
+  provider: string;
+  year: number;
+  region: string;
+  subject: string;
+  rank: string;
+}
+
+export interface ProgramOverview extends FactSource {
+  title: string;
+}
+
+export interface CareerOutcome extends FactSource {
+  id: string;
+  roles: string[];
+  employers: string[];
+}
+
+export interface ProgramDate extends FactSource {
+  id: string;
+  intake: string;
+  audience: "non_eu" | "eu" | "all";
+  kind: "application_open" | "deadline" | "study_start" | "study_end";
+  date: string;
+}
+
+export interface ProgramTestRequirement extends FactSource {
+  id: string;
+  test: "IELTS" | "GRE" | "GMAT";
+  required: boolean;
+  minimumTotal: number | null;
+  minimumVerbal: number | null;
+  minimumQuantitative: number | null;
+  minimumWriting: number | null;
+  minimumListening: number | null;
+  minimumReading: number | null;
+  minimumSpeaking: number | null;
+  scoreEdition: string;
+  comparisonReference?: string;
+  comparisonUrl?: string;
+}
+
+export interface ChinaEligibility extends FactSource {
+  policy: "unknown" | "accepted" | "restricted" | "institution_list";
+  listName: string;
+  evidenceLevel?: "high" | "medium" | "low";
+  communityConclusion?: string;
+  platformsChecked?: string[];
+  references?: Array<{
+    platform: "official" | "reddit" | "xiaohongshu" | "bilibili" | "youtube" | "zhihu" | "forum" | "agency";
+    title: string;
+    url: string;
+    note: string;
+    relevance: "program" | "school" | "adjacent";
+  }>;
+}
+
+export interface PremasterInfo extends FactSource {
+  supported: "yes" | "no" | "unknown";
+  nonEuEligible: "yes" | "no" | "unknown";
+  requirements: string;
+}
+
+export interface ProgramLinks {
+  programUrl: string;
+  curriculumUrl: string;
+  eligibilityUrl: string;
+  materialsUrl: string;
+  careersUrl: string;
+  premasterUrl: string;
+  studielinkUrl: string;
+  tuitionUrl?: string;
+}
+
+export interface AdmissionProbabilityPrior {
+  minimum: number;
+  maximum: number;
+  applicantCount?: number;
+  admittedCount?: number;
+  year: string;
+  sourceUrl: string;
+  sourceLabel: string;
+  origin: "official" | "manual" | "estimated";
+  updatedAt: string;
 }
 
 export interface CoreCourse {
   name: string;
   tags: string[];
   sourceUrl?: string;
+  nameZh?: string;
+  creditsEcts?: number | null;
+  originalText?: string;
+  summaryZh?: string;
 }
 
 export interface AdmissionCriterion {
@@ -85,6 +190,8 @@ export interface AdmissionCriterion {
   testType?: string;
   sourceUrl: string;
   verificationState: "pending" | "confirmed" | "manual";
+  creditsEcts?: number | null;
+  summaryZh?: string;
 }
 
 export interface ProgramRequirement {
@@ -100,6 +207,8 @@ export interface ProgramRequirement {
   fetchedAt?: string;
   verificationState: "manual" | "pending" | "confirmed";
   confidence?: number;
+  titleOriginal?: string;
+  summaryZh?: string;
 }
 
 export interface Program {
@@ -137,6 +246,16 @@ export interface Program {
   createdAt: string;
   updatedAt: string;
   seeded: boolean;
+  overview: ProgramOverview | null;
+  rankings: RankingFact[];
+  careerOutcomes: CareerOutcome[];
+  applicationDates: ProgramDate[];
+  testRequirements: ProgramTestRequirement[];
+  chinaEligibility: ChinaEligibility | null;
+  premasterInfo: PremasterInfo | null;
+  applicationLinks: ProgramLinks;
+  admissionProbabilityPrior: AdmissionProbabilityPrior | null;
+  fieldLocks: string[];
 }
 
 export interface EducationRecord {
@@ -162,6 +281,15 @@ export interface TestScore {
   type: "IELTS" | "TOEFL" | "GRE" | "GMAT" | "其他";
   score: string;
   testDate: string;
+  verbal?: string;
+  quantitative?: string;
+  writing?: string;
+  listening?: string;
+  reading?: string;
+  speaking?: string;
+  edition?: string;
+  etsPredictedGmat?: string;
+  etsPredictionDate?: string;
 }
 
 export interface Experience {
@@ -206,6 +334,12 @@ export interface Material {
   currentVersionId: string;
   createdAt: string;
   updatedAt: string;
+  scope: "basic" | "program";
+  programId: string;
+  requirementId: string;
+  prepared: boolean;
+  notes: string;
+  archived: boolean;
 }
 
 export interface MaterialVersion {
@@ -250,6 +384,10 @@ export interface Application {
   requirementsSourceUpdatedAt: string;
   createdAt: string;
   updatedAt: string;
+  startDate?: string;
+  endDate?: string;
+  studielinkUrl?: string;
+  scoreSnapshotId?: string;
 }
 
 export interface SourceSnapshot {
@@ -287,7 +425,7 @@ export interface FieldChange {
   excerpt: string;
   confidence: number;
   risk: "low" | "review";
-  status: "applied" | "pending" | "accepted" | "rejected";
+  status: "applied" | "pending" | "accepted" | "rejected" | "superseded";
   createdAt: string;
 }
 
@@ -323,7 +461,7 @@ export interface ExchangeRate {
   stale: boolean;
 }
 
-export const MATCH_DIMENSIONS = ["courses", "degree", "gpa", "experience", "language", "materials"] as const;
+export const MATCH_DIMENSIONS = ["courses", "degree", "gpa", "experience", "language", "materials", "basicMaterials", "specialMaterials", "project"] as const;
 export type MatchDimension = (typeof MATCH_DIMENSIONS)[number];
 
 export interface MatchDimensionScore {
@@ -334,11 +472,16 @@ export interface MatchDimensionScore {
   earned: number;
   reasons: string[];
   missingEvidence: string[];
+  known: boolean;
 }
 
 export interface ProgramComparison {
   program: ProgramDetail;
-  score: number;
+  score: number | null;
+  evidenceCoverage: number;
+  probabilityMinimum: number | null;
+  probabilityMaximum: number | null;
+  scoreStatus: "ready" | "insufficient" | "hard_risk";
   dataCompleteness: number;
   dimensions: MatchDimensionScore[];
   hardRisks: string[];
@@ -397,6 +540,8 @@ export interface BackupRecords {
   applications: Application[];
   sourceSnapshots: SourceSnapshot[];
   fieldChanges: FieldChange[];
+  scoreSnapshots?: ScoreSnapshot[];
+  matchOverrides?: RequirementMatchOverride[];
   catalogTableRows?: LocalCatalogRow[];
 }
 
@@ -412,6 +557,9 @@ export interface StorageStatus {
   local: {
     ready: boolean;
     dataDirectory: string;
+    privateDataDirectory: string;
+    materialDirectory: string;
+    migratedFromLegacy: boolean;
     universities: number;
     programs: number;
   };
@@ -423,6 +571,43 @@ export interface StorageStatus {
     error?: string;
   };
   firecrawl: { configured: boolean };
+}
+
+export type ScoreKind = "catalog" | "application";
+
+export interface ScoreSnapshot {
+  id: string;
+  kind: ScoreKind;
+  programId: string;
+  applicationId: string;
+  score: number | null;
+  evidenceCoverage: number;
+  probabilityMinimum: number | null;
+  probabilityMaximum: number | null;
+  hardRisks: string[];
+  dimensions: MatchDimensionScore[];
+  weights: Record<string, number>;
+  weightsVersion: string;
+  profileUpdatedAt: string;
+  programUpdatedAt: string;
+  materialUpdatedAt: string;
+  confirmedAt: string;
+}
+
+export interface RequirementMatchOverride {
+  id: string;
+  programId: string;
+  criterionId: string;
+  state: "matched" | "partial" | "not_matched" | "unknown";
+  note: string;
+  updatedAt: string;
+}
+
+export interface ScoringSettings {
+  catalog: Record<MatchDimension, number>;
+  application: Record<MatchDimension, number>;
+  version: string;
+  updatedAt: string;
 }
 
 export interface TransferConflict {

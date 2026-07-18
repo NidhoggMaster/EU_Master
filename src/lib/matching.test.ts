@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seededPrograms, universities } from "./catalog-data";
-import { compareProgram, similarity, standardTags } from "./matching";
+import { baseProbabilityInterval, compareProgram, similarity, standardTags, weightedGeometricScore } from "./matching";
 import { emptyProfile } from "./progress";
 import type { ProgramDetail } from "./types";
 
@@ -46,5 +46,30 @@ describe("transparent programme matching", () => {
   it("normalizes course tags and keeps similarity bounded", () => {
     expect(standardTags(["Linear algebra, SQL and research methods"])).toEqual(expect.arrayContaining(["mathematics", "database", "research_methods"]));
     expect(similarity(programme(), programme())).toBeLessThanOrEqual(100);
+  });
+
+  it("excludes unknown evidence from the score and requires 60% coverage", () => {
+    const dimensions = [
+      { key: "courses" as const, label: "课程", weight: 30, score: 100, earned: 30, reasons: [], missingEvidence: [], known: true },
+      { key: "language" as const, label: "标化", weight: 30, score: 100, earned: 30, reasons: [], missingEvidence: [], known: false },
+      { key: "degree" as const, label: "学历", weight: 40, score: 100, earned: 40, reasons: [], missingEvidence: [], known: false },
+    ];
+    expect(weightedGeometricScore(dimensions)).toEqual({ score: null, coverage: 30 });
+  });
+
+  it("uses a 5% floor for known zero scores in the geometric mean", () => {
+    const dimensions = [
+      { key: "courses" as const, label: "课程", weight: 50, score: 100, earned: 50, reasons: [], missingEvidence: [], known: true },
+      { key: "language" as const, label: "标化", weight: 50, score: 0, earned: 0, reasons: [], missingEvidence: [], known: true },
+    ];
+    const result = weightedGeometricScore(dimensions);
+    expect(result.coverage).toBe(100);
+    expect(result.score).toBe(22);
+  });
+
+  it("uses a Wilson interval when admission sample counts are available", () => {
+    const interval = baseProbabilityInterval({ minimum: 0.1, maximum: 0.2, applicantCount: 100, admittedCount: 20, year: "2025", sourceUrl: "https://example.edu", sourceLabel: "Official", origin: "official", updatedAt: "2026-07-18T00:00:00Z" });
+    expect(interval.minimum).toBeCloseTo(0.133, 2);
+    expect(interval.maximum).toBeCloseTo(0.289, 2);
   });
 });

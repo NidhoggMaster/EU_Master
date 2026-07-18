@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { ETS_GRE_COMPARISON_URL } from "@/lib/matching";
 import { applicantProfileSchema } from "@/lib/profile-schema";
 import { getProfile, saveProfile } from "@/lib/profile-client";
 import { emptyProfile, profileCompletion } from "@/lib/progress";
@@ -36,7 +38,7 @@ export default function ProfilePage() {
       const next = { ...profile, updatedAt: new Date().toISOString() };
       const saved = await saveProfile(next);
       setProfile(saved);
-      setMessage("个人档案已通过后端安全写入 Supabase。");
+      setMessage("个人档案已写入本机 Private_Data，不会发送到 Supabase。");
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "个人档案保存失败，请稍后重试。");
     } finally {
@@ -116,15 +118,30 @@ export default function ProfilePage() {
         </section>
 
         <section className="form-section">
-          <div className="section-title section-title-action"><span>04</span><div><h2>考试成绩</h2><p>语言、GRE 或 GMAT</p></div><button type="button" onClick={() => setProfile({ ...profile, tests: [...profile.tests, newTest()] })}>＋ 添加</button></div>
+          <div className="section-title section-title-action"><span>04</span><div><h2>考试成绩</h2><p>语言、GRE 或 GMAT</p></div><a className="heading-tool-link" href={ETS_GRE_COMPARISON_URL} target="_blank" rel="noreferrer">ETS 换算<ExternalLink size={13} aria-hidden="true" /></a><button type="button" onClick={() => setProfile({ ...profile, tests: [...profile.tests, newTest()] })}>＋ 添加</button></div>
           {!profile.tests.length && <p className="empty-inline">尚未添加考试成绩。</p>}
           {profile.tests.map((item, index) => (
-            <div className="repeat-card compact" key={item.id}>
+            <div className="repeat-card test-score-card" key={item.id}>
               <div className="form-grid form-grid-three">
                 <label>考试<select value={item.type} onChange={(event) => updateCollection<TestScore>("tests", index, { type: event.target.value as TestScore["type"] })}><option>IELTS</option><option>TOEFL</option><option>GRE</option><option>GMAT</option><option>其他</option></select></label>
                 <label>成绩<input value={item.score} onChange={(event) => updateCollection<TestScore>("tests", index, { score: event.target.value })} /></label>
                 <label>考试日期<input type="date" value={item.testDate} onChange={(event) => updateCollection<TestScore>("tests", index, { testDate: event.target.value })} /></label>
               </div>
+              {item.type === "IELTS" && <div className="form-grid form-grid-four test-score-details">
+                <label>Listening<input inputMode="decimal" value={item.listening ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { listening: event.target.value })} /></label>
+                <label>Reading<input inputMode="decimal" value={item.reading ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { reading: event.target.value })} /></label>
+                <label>Writing<input inputMode="decimal" value={item.writing ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { writing: event.target.value })} /></label>
+                <label>Speaking<input inputMode="decimal" value={item.speaking ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { speaking: event.target.value })} /></label>
+              </div>}
+              {(item.type === "GRE" || item.type === "GMAT") && <div className="test-score-details">
+                <div className="form-grid form-grid-four">
+                  <label>Verbal<input inputMode="numeric" value={item.verbal ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { verbal: event.target.value })} /></label>
+                  <label>Quantitative<input inputMode="numeric" value={item.quantitative ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { quantitative: event.target.value })} /></label>
+                  <label>Writing<input inputMode="decimal" value={item.writing ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { writing: event.target.value })} /></label>
+                  <label>考试版本<input value={item.edition ?? ""} placeholder="例如 GRE General" onChange={(event) => updateCollection<TestScore>("tests", index, { edition: event.target.value })} /></label>
+                </div>
+                {item.type === "GRE" && <div className="ets-result-row"><a href={ETS_GRE_COMPARISON_URL} target="_blank" rel="noreferrer">ETS 官方 GRE–GMAT 换算工具<ExternalLink size={13} aria-hidden="true" /></a><label>官网换算结果<input inputMode="numeric" value={item.etsPredictedGmat ?? ""} placeholder="手动填写" onChange={(event) => updateCollection<TestScore>("tests", index, { etsPredictedGmat: event.target.value })} /></label><label>换算日期<input type="date" value={item.etsPredictionDate ?? ""} onChange={(event) => updateCollection<TestScore>("tests", index, { etsPredictionDate: event.target.value })} /></label></div>}
+              </div>}
               <button className="text-danger" type="button" onClick={() => removeCollection("tests", index)}>删除</button>
             </div>
           ))}
@@ -163,7 +180,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <div className="sticky-save"><span>档案完成度 {completion}% · Supabase 云端存储</span><button className="dashboard-primary" type="submit" disabled={loading || saving}>{saving ? "正在保存…" : "保存个人档案"}</button></div>
+        <div className="sticky-save"><span>档案完成度 {completion}% · 仅本机 Private_Data</span><button className="dashboard-primary" type="submit" disabled={loading || saving}>{saving ? "正在保存…" : "保存个人档案"}</button></div>
       </form>
     </div>
   );

@@ -70,6 +70,24 @@ function program(
     createdAt: now,
     updatedAt: now,
     seeded: true,
+    overview: null,
+    rankings: [],
+    careerOutcomes: [],
+    applicationDates: [],
+    testRequirements: [],
+    chinaEligibility: null,
+    premasterInfo: null,
+    applicationLinks: {
+      programUrl: sourceUrl,
+      curriculumUrl: "",
+      eligibilityUrl: "",
+      materialsUrl: "",
+      careersUrl: "",
+      premasterUrl: "",
+      studielinkUrl: "https://www.studielink.nl/",
+    },
+    admissionProbabilityPrior: null,
+    fieldLocks: [],
   };
 }
 

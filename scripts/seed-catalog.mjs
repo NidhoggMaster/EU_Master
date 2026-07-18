@@ -105,7 +105,7 @@ export async function runCatalogSeed({
     skipped: [],
     failed: [],
     providers: { firecrawl: 0, direct: 0 },
-    pendingReview: 0,
+    automaticUpdates: 0,
   };
 
   logger.log(`[catalog:seed] ${health.storage.catalogMode} 模式健康检查通过，共 ${programs.length} 个预置项目。`);
@@ -133,16 +133,16 @@ export async function runCatalogSeed({
       continue;
     }
     const provider = result.body.provider === "firecrawl" ? "firecrawl" : "direct";
-    const reviewCount = Array.isArray(result.body.reviewItems) ? result.body.reviewItems.length : 0;
+    const updateCount = Array.isArray(result.body.automaticUpdates) ? result.body.automaticUpdates.length : 0;
     summary.providers[provider] += 1;
-    summary.pendingReview += reviewCount;
+    summary.automaticUpdates += updateCount;
     summary.succeeded.push(program.id);
-    logger.log(`[ok] ${program.id}: ${provider}, ${reviewCount} 项待审核`);
+    logger.log(`[ok] ${program.id}: ${provider}, 自动写入 ${updateCount} 项`);
   }
 
   logger.log("[catalog:seed] 完成汇总");
   logger.log(`  成功 ${summary.succeeded.length} · 跳过 ${summary.skipped.length} · 失败 ${summary.failed.length}`);
-  logger.log(`  Firecrawl ${summary.providers.firecrawl} · 合规直连 ${summary.providers.direct} · 待审核 ${summary.pendingReview}`);
+  logger.log(`  Firecrawl ${summary.providers.firecrawl} · 合规直连 ${summary.providers.direct} · 自动写入 ${summary.automaticUpdates}`);
   return summary;
 }
 

@@ -1,7 +1,20 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingExcludes: {
+    "/api/*": [
+      "./next.config.ts",
+      "./README.md",
+      "./AGENTS.md",
+      "./scripts/**/*",
+      "./supabase/**/*",
+      "./local-data/**/*",
+      "./Private_Data/**/*",
+      "./material_center/**/*",
+      "./.logs/**/*",
+      "./src/**/*.test.ts",
+    ],
+  },
 };
 
 export default nextConfig;

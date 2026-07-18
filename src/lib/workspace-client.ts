@@ -10,9 +10,18 @@ export async function getMaterials() {
   return json<Material[]>(await fetch("/api/materials", { cache: "no-store" }), "读取材料失败。");
 }
 
-export async function createMaterial(title: string, type: MaterialType, status: Material["status"], file: File) {
+export async function createMaterial(
+  title: string,
+  type: MaterialType,
+  status: Material["status"],
+  file?: File,
+  options: { scope?: Material["scope"]; programId?: string; requirementId?: string; prepared?: boolean; notes?: string } = {},
+) {
   const form = new FormData();
-  form.set("title", title); form.set("type", type); form.set("status", status); form.set("file", file);
+  form.set("title", title); form.set("type", type); form.set("status", status);
+  form.set("scope", options.scope ?? "basic"); form.set("programId", options.programId ?? ""); form.set("requirementId", options.requirementId ?? "");
+  form.set("prepared", String(options.prepared ?? status === "ready")); form.set("notes", options.notes ?? "");
+  if (file) form.set("file", file);
   return json<Material>(await fetch("/api/materials", { method: "POST", body: form }), "创建材料失败。");
 }
 

@@ -6,9 +6,15 @@ export const materialSchema = z.object({
   title: z.string().min(1).max(180),
   type: z.enum(MATERIAL_TYPES),
   status: z.enum(["draft", "ready", "expired"]),
-  currentVersionId: z.string().min(1).max(100),
+  currentVersionId: z.string().max(100),
   createdAt: z.string(),
   updatedAt: z.string(),
+  scope: z.enum(["basic", "program"]).default("basic"),
+  programId: z.string().max(120).default(""),
+  requirementId: z.string().max(120).default(""),
+  prepared: z.boolean().default(false),
+  notes: z.string().max(5_000).default(""),
+  archived: z.boolean().default(false),
 });
 
 const requirementSnapshotSchema = z.object({
@@ -25,6 +31,10 @@ export const applicationSchema = z.object({
   intake: z.string().max(120), deadline: z.string().max(30), status: z.enum(["planning", "preparing", "submitted", "offer", "rejected", "withdrawn"]),
   requirements: z.array(requirementSnapshotSchema).max(300), tasks: z.array(applicationTaskSchema).max(500), requirementsSourceUpdatedAt: z.string(),
   createdAt: z.string(), updatedAt: z.string(),
+  startDate: z.string().max(30).optional(),
+  endDate: z.string().max(30).optional(),
+  studielinkUrl: z.string().max(2_000).optional(),
+  scoreSnapshotId: z.string().max(100).optional(),
 });
 
 export function validateMaterialFile(file: File) {

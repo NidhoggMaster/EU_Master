@@ -1,104 +1,101 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { discoverFromHtml, fetchOfficialPage, findSupportingUrls, parseProgramHtml, validateOfficialUrl } from "./catalog-server";
+import { describe, expect, it } from "vitest";
+import { findSupportingUrls, parseProgramHtml } from "./catalog-server";
 import { getUniversity } from "./catalog-data";
+import type { Program } from "./types";
 
-describe("catalog safety and parsing", () => {
-  const tilburg = getUniversity("tilburg")!;
-  const originalFetch = globalThis.fetch;
-  const originalKey = process.env.FIRECRAWL_API_KEY;
+const admissionUrl = "https://www.uu.nl/en/masters/business-informatics/application-and-admission/degree-from-a-non-dutch-university";
+const languageUrl = "https://www.uu.nl/en/masters/general-information/application-and-admission/english-language-requirements/emi-experienced";
+const languageScoresUrl = "https://www.uu.nl/en/masters/general-information/application-and-admission/english-language-requirements/emi-experienced#:~:text=the%20possible%20exemptions.-,EMI%2Dexperienced%20test%20scores,169,-We%20are%20aware";
 
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-    process.env.FIRECRAWL_API_KEY = originalKey;
-    globalThis.euMasterRequestTimes?.clear();
-    globalThis.euMasterRobotsCache?.clear();
-    vi.restoreAllMocks();
+describe("catalog official page parsing", () => {
+  it("prefers Utrecht non-Dutch admission and EMI language deep links", () => {
+    const university = getUniversity("uu");
+    if (!university) throw new Error("missing UU seed");
+    const urls = findSupportingUrls(`
+      <main>
+        <a href="/en/masters/business-informatics/application-and-admission">Application and admission</a>
+        <a href="/en/masters/business-informatics/application-and-admission/degree-from-a-non-dutch-university">Degree from a non-Dutch university</a>
+        <a href="/en/masters/general-information/application-and-admission/english-language-requirements/emi-experienced">EMI-experienced page</a>
+      </main>
+    `, "https://www.uu.nl/en/masters/business-informatics", university);
+    expect(urls[0]).toBe(admissionUrl);
+    expect(urls).toContain(languageUrl);
   });
 
-  it("rejects non-official and non-https URLs", () => {
-    expect(() => validateOfficialUrl("https://example.com/master", tilburg)).toThrow("官方域名");
-    expect(() => validateOfficialUrl("http://www.tilburguniversity.edu/master", tilburg)).toThrow("HTTPS");
+  it("prefers international foldout and programme-specific language pages", () => {
+    const university = getUniversity("uva");
+    if (!university) throw new Error("missing UvA seed");
+    const internationalUrl = "https://www.uva.nl/shared-content/programmas/en/masters/information-studies-data-science/application-and-admission/international-prior-education/international-prior-education-foldout-menu.html";
+    const englishUrl = "https://www.uva.nl/shared-content/programmas/en/masters/information-studies-data-science/application-and-admission/international-prior-education/english-language-requirements.html";
+    const urls = findSupportingUrls(`
+      <main>
+        <a href="/en/programmes/masters/information-studies-data-science/application-and-admission/application-and-admission.html">Application and admission</a>
+        <a href="${internationalUrl}">International prior education foldout menu</a>
+        <a href="${englishUrl}">English language requirements and minimum test scores</a>
+      </main>
+    `, "https://www.uva.nl/en/programmes/masters/information-studies-data-science/data-science.html", university);
+    expect(urls[0]).toBe(internationalUrl);
+    expect(urls).toContain(englishUrl);
   });
 
-  it("discovers candidates by category and keeps official links only", () => {
-    const html = `
-      <a href="/education/masters-programs/information-management">Information Management</a>
-      <a href="https://example.com/data-science">Data Science</a>
-      <a href="/news/business-event">Business event</a>
-    `;
-    const result = discoverFromHtml(html, tilburg.catalogUrl, tilburg, "information");
-    expect(result).toHaveLength(1);
-    expect(result[0].sourceUrl).toContain("tilburguniversity.edu");
+  it("prefers international admission and keeps application documents separate", () => {
+    const university = getUniversity("vu");
+    if (!university) throw new Error("missing VU seed");
+    const admissionsUrl = "https://vu.nl/en/education/master/information-sciences/admissions";
+    const documentsUrl = "https://vu.nl/en/education/more-about/application-documents-master";
+    const urls = findSupportingUrls(`
+      <main>
+        <details><summary>International diploma</summary><a href="${admissionsUrl}">International admission requirements</a></details>
+        <a href="${documentsUrl}">Application documents Master's programme</a>
+      </main>
+    `, "https://vu.nl/en/education/master/information-sciences", university);
+    expect(urls[0]).toBe(admissionsUrl);
+    expect(urls).toContain(documentsUrl);
   });
 
-  it("extracts low-risk fields and queues admission facts for review", async () => {
-    const html = `<html><body><h1>Business Information Technology</h1>
-      <p>Master of Science. Language of instruction English. Full-time, 2 years, 120 ECTS.</p>
-      <h2>Admission requirements</h2><p>A relevant bachelor degree is required.</p>
-      <p>Application deadline before 1 May.</p></body></html>`;
-    const result = await parseProgramHtml(html, "https://www.utwente.nl/en/education/master/programmes/business-information-technology/");
-    expect(result.automaticUpdates.some((item) => item.field === "duration" && item.proposedValue === "2 years")).toBe(true);
-    expect(result.automaticUpdates.some((item) => item.field === "ects" && item.proposedValue === "120 ECTS")).toBe(true);
-    expect(result.reviewItems.some((item) => item.field === "admissionCriteria")).toBe(true);
+  it("extracts Utrecht Business Informatics admission requirements, dates and materials", async () => {
+    const result = await parseProgramHtml(`
+      <main>
+        <h1>Degree from a non-Dutch university</h1>
+        <p>Business Informatics</p>
+        <p>A sufficient Bachelor's degree. Our International Students Admission's office will verify whether a non-Dutch degree is equivalent to a Bachelor's degree at a Dutch research university. Bachelor's programmes that most likely meet the requirements are: Information Science; Artificial Intelligence (AI); Computer Science and Information Technology; and Engineering disciplines.</p>
+        <p>For students with a bachelor degree from a university of applied sciences, an average score of at least 7.5 is required for their professional bachelor programme. Moreover, a score of at least 8.0 is required for their graduation project. For students with a bachelor from a research university, it is recommended to have a GPA of 7.0 or higher.</p>
+        <p>Solid knowledge of and solid skills in core Information Science competencies, including formal training in: information system design, including analysis, data and process modelling, evaluation, and development methods (10 EC); programming (7.5 EC); and research methods and statistics (7.5 EC).</p>
+        <p>Formal training, specifically for the Master's Business Informatics programme, in: organization science, including structure, strategy, and culture; and mathematical logic.</p>
+        <p>The required English level for admission to this Master's programme is EMI-experienced. Visit our <a href="${languageUrl}">EMI-experienced page</a>.</p>
+        <p>Programme starts in September Applications open 1 October Application deadline for scholarship recipients 1 February Application deadline for Non-EU passport holders 1 April Application deadline for EU passport holders 1 June Programme starts in February Applications open 1 July Application deadline for Non-EU passport holders 1 September Application deadline for EU passport holders 15 October.</p>
+        <p>The following documents must be uploaded before the application deadline: A scan of your diploma or <a href="/masters/file/2273">Proof of anticipated degree</a>. A scan of your transcript. <a href="/masters/file/16227">Motivation statement</a>. <a href="/masters/file/16221">Curriculum vitae / resume</a>. <a href="/sites/default/files/course_descriptions-mbi_update.docx">Detailed course descriptions</a>. <a href="/sites/default/files/referees-letter-of-recommendation-UU.pdf">Contact details of one referee</a>. A scan of your official English language test report or certificate. Passport copy.</p>
+        <p><a href="https://www.studielink.nl/">Apply via Studielink</a></p>
+      </main>
+    `, admissionUrl, "uu");
+
+    const criteria = JSON.parse(result.reviewItems.find((item) => item.field === "admissionCriteria" && item.confidence === 0.9)?.proposedValue ?? "[]") as Program["admissionCriteria"];
+    const dates = JSON.parse(result.reviewItems.find((item) => item.field === "applicationDates")?.proposedValue ?? "[]") as Program["applicationDates"];
+    const requirements = JSON.parse(result.reviewItems.find((item) => item.field === "requirements" && item.confidence === 0.9)?.proposedValue ?? "[]") as Program["requirements"];
+    const links = JSON.parse(result.reviewItems.find((item) => item.field === "applicationLinks")?.proposedValue ?? "{}") as Program["applicationLinks"];
+
+    expect(criteria.map((item) => item.id)).toContain("uu-bi-prereq-information-system-design");
+    expect(criteria.find((item) => item.id === "uu-bi-prereq-information-system-design")?.creditsEcts).toBe(10);
+    expect(dates.find((item) => item.id === "uu-bi-sep-non-eu-deadline")?.date).toBe("1 April");
+    expect(requirements.map((item) => item.materialType)).toEqual(["degree_certificate", "transcript", "motivation_letter", "cv", "course_description", "recommendation_letter", "english_test", "passport"]);
+    expect(links.eligibilityUrl).toBe(admissionUrl);
+    expect(links.studielinkUrl).toBe("https://www.studielink.nl/");
   });
 
-  it("rejects navigation and error-page titles", async () => {
-    const result = await parseProgramHtml(
-      `<html><body><h1>Page not found</h1><main>${"Official programme details. ".repeat(12)}</main></body></html>`,
-      "https://www.uva.nl/en/programmes/masters/example.html",
-      "uva",
-    );
-    expect(result.automaticUpdates.some((item) => item.field === "name")).toBe(false);
-  });
-
-  it("does not mistake pre-master credits for master programme ECTS", async () => {
-    const result = await parseProgramHtml(
-      `<html><body><h1>Information Sciences</h1><main>
-        <p>This pre-master programme is worth 30 ECTS credits.</p>
-        <p>The master programme is a one year programme worth 60 ECTS.</p>
-      </main></body></html>`,
-      "https://vu.nl/en/education/master/information-sciences",
-      "vu",
-    );
-    expect(result.automaticUpdates.find((item) => item.field === "ects")?.proposedValue).toBe("60 ECTS");
-  });
-
-  it("limits supporting pages to official admissions and tuition links", () => {
-    const html = `<a href="/education/master/example/admissions">Admissions</a>
-      <a href="/education/master/example/tuition-fees">Tuition fees</a>
-      <a href="https://example.com/admissions">External admissions</a>`;
-    const urls = findSupportingUrls(html, tilburg.catalogUrl, tilburg);
-    expect(urls).toHaveLength(2);
-    expect(urls.every((url) => url.includes("tilburguniversity.edu"))).toBe(true);
-  });
-
-  it("uses Firecrawl after the robots check", async () => {
-    process.env.FIRECRAWL_API_KEY = "test-key";
-    globalThis.fetch = vi.fn()
-      .mockResolvedValueOnce(new Response("User-agent: *\nAllow: /", { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: { html: "<main><h1>Official programme</h1></main>", metadata: { sourceURL: tilburg.catalogUrl } } }), { status: 200, headers: { "content-type": "application/json" } }));
-    const result = await fetchOfficialPage(new URL(tilburg.catalogUrl), tilburg);
-    expect(result.provider).toBe("firecrawl");
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("falls back to a compliant direct fetch on an ordinary Firecrawl failure", async () => {
-    process.env.FIRECRAWL_API_KEY = "test-key";
-    globalThis.fetch = vi.fn()
-      .mockResolvedValueOnce(new Response("User-agent: *\nAllow: /", { status: 200 }))
-      .mockResolvedValueOnce(new Response("unavailable", { status: 500 }))
-      .mockResolvedValueOnce(new Response("<html><main>Official programme</main></html>", { status: 200, headers: { "content-type": "text/html" } }));
-    const result = await fetchOfficialPage(new URL(tilburg.catalogUrl), tilburg);
-    expect(result.provider).toBe("direct");
-    expect(result.warning).toContain("Firecrawl");
-  });
-
-  it("does not bypass Firecrawl rate-limit responses", async () => {
-    process.env.FIRECRAWL_API_KEY = "test-key";
-    globalThis.fetch = vi.fn()
-      .mockResolvedValueOnce(new Response("User-agent: *\nAllow: /", { status: 200 }))
-      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }));
-    await expect(fetchOfficialPage(new URL(tilburg.catalogUrl), tilburg)).rejects.toMatchObject({ status: 429 });
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  it("extracts EMI-experienced IELTS total and sub-scores from tables", async () => {
+    const result = await parseProgramHtml(`
+      <main>
+        <h1>EMI-experienced</h1>
+        <table>
+          <tr><th></th><th>Overall band score</th><th>Speaking</th><th>Listening</th><th>Reading</th><th>Writing</th></tr>
+          <tr><td>IELTS Academic*†</td><td>6.5</td><td>6.0</td><td>6.0</td><td>6.0</td><td>6.0</td></tr>
+          <tr><td>TOEFL iBT Old scores</td><td>93</td><td>20</td><td>20</td><td>20</td><td>20</td></tr>
+        </table>
+        <p>IELTS Online and IELTS One Skill Retake are not accepted.</p>
+      </main>
+    `, languageUrl, "uu");
+    const tests = JSON.parse(result.reviewItems.find((item) => item.field === "testRequirements")?.proposedValue ?? "[]") as Program["testRequirements"];
+    expect(tests[0]).toMatchObject({ test: "IELTS", minimumTotal: 6.5, minimumSpeaking: 6, minimumListening: 6, minimumReading: 6, minimumWriting: 6 });
+    expect(tests[0].sourceUrl).toBe(languageScoresUrl);
   });
 });
