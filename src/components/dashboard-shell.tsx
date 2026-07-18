@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BookOpen, Columns3, Files, LayoutDashboard, Settings, UserRound, ClipboardList } from "lucide-react";
 import type { CatalogMode, StorageStatus } from "@/lib/types";
 
 const navigation = [
-  { href: "/dashboard", label: "总览", index: "01", exact: true },
-  { href: "/dashboard/programs", label: "项目目录", index: "02" },
-  { href: "/dashboard/programs/compare", label: "项目对比", index: "03" },
-  { href: "/dashboard/materials", label: "材料中心", index: "04" },
-  { href: "/dashboard/applications", label: "申请管理", index: "05" },
-  { href: "/dashboard/profile", label: "个人档案", index: "06" },
-  { href: "/dashboard/settings", label: "设置与备份", index: "07" },
+  { href: "/dashboard", label: "总览", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/programs", label: "项目目录", icon: BookOpen },
+  { href: "/dashboard/compare", label: "项目对比", icon: Columns3 },
+  { href: "/dashboard/applications", label: "项目申请", icon: ClipboardList },
+  { href: "/dashboard/personal/profile", label: "个人信息", icon: UserRound, group: "个人中心" },
+  { href: "/dashboard/personal/materials", label: "材料中心", icon: Files, group: "个人中心" },
+  { href: "/dashboard/settings", label: "设置与数据", icon: Settings },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [storage, setStorage] = useState<StorageStatus>();
   const [switching, setSwitching] = useState(false);
   const [storageError, setStorageError] = useState("");
-  const isActive = (item: (typeof navigation)[number]) => item.exact ? pathname === item.href : item.href === "/dashboard/programs" ? pathname.startsWith(item.href) && !pathname.startsWith("/dashboard/programs/compare") : pathname.startsWith(item.href);
+  const isActive = (item: (typeof navigation)[number]) => item.exact ? pathname === item.href : pathname.startsWith(item.href);
   const current = navigation.find(isActive) ?? navigation[0];
 
   useEffect(() => {
@@ -58,9 +59,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <span className="brand-copy"><strong>EU Master</strong><small>Application Manager</small></span>
         </Link>
         <nav className="dashboard-nav" aria-label="控制台导航">
-          {navigation.map((item) => {
+          {navigation.map((item, index) => {
             const active = isActive(item);
-            return <Link className={active ? "active" : ""} href={item.href} key={item.href}><span>{item.index}</span>{item.label}</Link>;
+            const Icon = item.icon;
+            const showGroup = item.group && navigation[index - 1]?.group !== item.group;
+            return <div className="dashboard-nav-item" key={item.href}>{showGroup && <span className="dashboard-nav-group">{item.group}</span>}<Link className={active ? "active" : ""} href={item.href}><Icon size={16} aria-hidden="true" />{item.label}</Link></div>;
           })}
         </nav>
         <div className="sidebar-bottom">
@@ -90,9 +93,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
         {children}
         <nav className="mobile-dashboard-nav" aria-label="手机控制台导航">
-          {navigation.slice(0, 5).map((item) => {
+          {navigation.map((item) => {
             const active = isActive(item);
-            return <Link className={active ? "active" : ""} href={item.href} key={item.href}><span>{item.index}</span>{item.label.slice(0, 2)}</Link>;
+            const Icon = item.icon;
+            return <Link className={active ? "active" : ""} href={item.href} key={item.href}><Icon size={15} aria-hidden="true" /><span>{item.label.slice(0, 4)}</span></Link>;
           })}
         </nav>
       </section>

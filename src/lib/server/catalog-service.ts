@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { CatalogMode, FieldChange, Program, ProgramCategory, ProgramDetail, TransferPreview } from "@/lib/types";
+import { stableStringify } from "@/lib/stable-json";
 import {
   decideFieldChange as decideRemoteFieldChange,
   getProgramDetail as getRemoteProgramDetail,
@@ -103,7 +104,7 @@ export async function previewCatalogTransfer(from: CatalogMode, to: CatalogMode)
   for (const program of source) {
     const existing = targetMap.get(program.id);
     if (!existing) newItems.push({ id: program.id, name: program.name });
-    else conflicts.push({ id: program.id, name: program.name, reason: JSON.stringify(comparable(existing)) === JSON.stringify(comparable(program)) ? "identical" : "different" });
+    else conflicts.push({ id: program.id, name: program.name, reason: stableStringify(comparable(existing)) === stableStringify(comparable(program)) ? "identical" : "different" });
   }
   return { from, to, newItems, conflicts };
 }

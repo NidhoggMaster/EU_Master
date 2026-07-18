@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const storage = await getStorageStatus();
+    // Startup readiness must remain independent of optional remote storage.
+    const storage = await getStorageStatus({ checkSupabase: false });
     return Response.json({ status: "ready", storage });
   } catch (error) {
     return Response.json({ status: "error", error: error instanceof Error ? error.message : "本地存储初始化失败。" }, { status: 503 });

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { StorageStatus } from "@/lib/types";
-import { getCatalogMode, localDataDirectory, localStoreCounts } from "./local-store";
+import { getCatalogMode, getLocalMeta, localStoreCounts, materialDataDirectory, privateDataDirectory } from "./local-store";
 import { checkSupabaseHealth, isSupabaseConfigured } from "./postgres";
 
 function connectionMessage(error: unknown) {
@@ -13,7 +13,7 @@ function connectionMessage(error: unknown) {
   return `Supabase 连接失败：${message}`;
 }
 
-export async function getStorageStatus(): Promise<StorageStatus> {
+export async function getStorageStatus({ checkSupabase = true }: { checkSupabase?: boolean } = {}): Promise<StorageStatus> {
   const [catalogMode, counts] = await Promise.all([getCatalogMode(), localStoreCounts()]);
   const configured = isSupabaseConfigured();
   let supabase: StorageStatus["supabase"] = {
@@ -23,7 +23,7 @@ export async function getStorageStatus(): Promise<StorageStatus> {
     seededPrograms: 0,
     error: configured ? undefined : "未配置有效的 Supabase Session Pool 和 CA 证书。",
   };
-  if (configured) {
+  if (configured && checkSupabase) {
     try {
       supabase = { configured: true, ...(await checkSupabaseHealth()) };
     } catch (error) {
@@ -32,7 +32,10 @@ export async function getStorageStatus(): Promise<StorageStatus> {
   }
   return {
     catalogMode,
-    local: { ready: true, dataDirectory: localDataDirectory(), ...counts },
+    local: {
+      ready: true, dataDirectory: privateDataDirectory(), privateDataDirectory: privateDataDirectory(), materialDirectory: materialDataDirectory(),
+      migratedFromLegacy: (await getLocalMeta("migratedFromLegacy")) === "true", ...counts,
+    },
     supabase,
     firecrawl: { configured: Boolean(process.env.FIRECRAWL_API_KEY?.trim()) },
   };

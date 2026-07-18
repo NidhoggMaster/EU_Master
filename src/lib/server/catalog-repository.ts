@@ -40,6 +40,18 @@ function mapProgram(row: Row): Program {
     admissionCriteria: (row.admission_criteria as Program["admissionCriteria"]) ?? [], requirements: (row.requirements as Program["requirements"]) ?? [],
     dataCompleteness: Number(row.data_completeness ?? 0), status: row.status as Program["status"], seeded: Boolean(row.seeded),
     lastFetchedAt: iso(row.last_fetched_at), createdAt: iso(row.created_at) ?? "", updatedAt: iso(row.updated_at) ?? "",
+    overview: (row.overview as Program["overview"]) ?? null,
+    rankings: (row.rankings as Program["rankings"]) ?? [],
+    careerOutcomes: (row.career_outcomes as Program["careerOutcomes"]) ?? [],
+    applicationDates: (row.application_dates as Program["applicationDates"]) ?? [],
+    testRequirements: (row.test_requirements as Program["testRequirements"]) ?? [],
+    chinaEligibility: (row.china_eligibility as Program["chinaEligibility"]) ?? null,
+    premasterInfo: (row.premaster_info as Program["premasterInfo"]) ?? null,
+    applicationLinks: (row.application_links as Program["applicationLinks"]) ?? {
+      programUrl: String(row.source_url), curriculumUrl: "", eligibilityUrl: "", materialsUrl: "", careersUrl: "", premasterUrl: "", studielinkUrl: "https://www.studielink.nl/",
+    },
+    admissionProbabilityPrior: (row.admission_probability_prior as Program["admissionProbabilityPrior"]) ?? null,
+    fieldLocks: (row.field_locks as string[]) ?? [],
   };
 }
 
@@ -127,12 +139,14 @@ export async function upsertCandidate(input: { id?: string; universityId: string
 
 export async function updateProgram(program: Program) {
   return withDb(async (client) => {
-    await client.query(`update private.programs set name=$2,categories=$3,source_url=$4,faculty=$5,degree_type=$6,language=$7,duration=$8,ects=$9,mode=$10,intakes=$11,deadline=$12,tuition=$13,tuition_eur=$14,tuition_academic_year=$15,application_fee=$16,application_fee_eur=$17,application_platform=$18,premaster=$19,quota=$20,campus_name=$21,city=$22,campus_area=$23,location_notes=$24,core_courses=$25,admission_criteria=$26,requirements=$27,data_completeness=$28,status=$29,last_fetched_at=$30,updated_at=now() where id=$1`, [
+    await client.query(`update private.programs set name=$2,categories=$3,source_url=$4,faculty=$5,degree_type=$6,language=$7,duration=$8,ects=$9,mode=$10,intakes=$11,deadline=$12,tuition=$13,tuition_eur=$14,tuition_academic_year=$15,application_fee=$16,application_fee_eur=$17,application_platform=$18,premaster=$19,quota=$20,campus_name=$21,city=$22,campus_area=$23,location_notes=$24,core_courses=$25,admission_criteria=$26,requirements=$27,data_completeness=$28,status=$29,last_fetched_at=$30,overview=$31,rankings=$32,career_outcomes=$33,application_dates=$34,test_requirements=$35,china_eligibility=$36,premaster_info=$37,application_links=$38,admission_probability_prior=$39,field_locks=$40,updated_at=now() where id=$1`, [
       program.id, program.name, program.categories, program.sourceUrl, program.faculty, program.degreeType, program.language, program.duration, program.ects,
       program.mode, program.intakes, program.deadline, program.tuition, program.tuitionEur, program.tuitionAcademicYear, program.applicationFee,
       program.applicationFeeEur, program.applicationPlatform, program.premaster, program.quota, program.campusName, program.city, program.campusArea,
       program.locationNotes, JSON.stringify(program.coreCourses), JSON.stringify(program.admissionCriteria), JSON.stringify(program.requirements),
-      program.dataCompleteness, program.status, program.lastFetchedAt ?? null,
+      program.dataCompleteness, program.status, program.lastFetchedAt ?? null, JSON.stringify(program.overview), JSON.stringify(program.rankings),
+      JSON.stringify(program.careerOutcomes), JSON.stringify(program.applicationDates), JSON.stringify(program.testRequirements), JSON.stringify(program.chinaEligibility),
+      JSON.stringify(program.premasterInfo), JSON.stringify(program.applicationLinks), JSON.stringify(program.admissionProbabilityPrior), program.fieldLocks,
     ]);
     return detailWithClient(client, program.id);
   });
@@ -143,15 +157,6 @@ export async function getCurrentProfile() {
     const row = (await client.query("select * from private.applicant_profiles where id='current'")).rows[0];
     if (!row) return undefined;
     return { id: "current", basic: { fullName: row.full_name, email: row.email, nationality: row.nationality, currentCity: row.current_city }, education: row.education, courses: row.courses, tests: row.tests, experiences: row.experiences, skills: row.skills, preferences: row.preferences, updatedAt: iso(row.client_updated_at ?? row.updated_at) ?? "" } satisfies ApplicantProfile;
-  });
-}
-
-export async function saveCurrentProfile(profile: ApplicantProfile) {
-  return withDb(async (client) => {
-    await client.query(`insert into private.applicant_profiles (id,full_name,email,nationality,current_city,education,courses,tests,experiences,skills,preferences,client_updated_at)
-      values ('current',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) on conflict (id) do update set full_name=excluded.full_name,email=excluded.email,nationality=excluded.nationality,current_city=excluded.current_city,education=excluded.education,courses=excluded.courses,tests=excluded.tests,experiences=excluded.experiences,skills=excluded.skills,preferences=excluded.preferences,client_updated_at=excluded.client_updated_at,updated_at=now()`,
-      [profile.basic.fullName, profile.basic.email, profile.basic.nationality, profile.basic.currentCity, JSON.stringify(profile.education), JSON.stringify(profile.courses), JSON.stringify(profile.tests), JSON.stringify(profile.experiences), JSON.stringify(profile.skills), JSON.stringify(profile.preferences), profile.updatedAt]);
-    return profile;
   });
 }
 

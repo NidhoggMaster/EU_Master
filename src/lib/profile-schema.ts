@@ -30,6 +30,15 @@ const testScoreSchema = z.object({
   type: z.enum(["IELTS", "TOEFL", "GRE", "GMAT", "其他"]),
   score: shortText(80),
   testDate: shortText(40),
+  verbal: shortText(40).optional(),
+  quantitative: shortText(40).optional(),
+  writing: shortText(40).optional(),
+  listening: shortText(40).optional(),
+  reading: shortText(40).optional(),
+  speaking: shortText(40).optional(),
+  edition: shortText(80).optional(),
+  etsPredictedGmat: shortText(40).optional(),
+  etsPredictionDate: shortText(40).optional(),
 });
 
 const experienceSchema = z.object({

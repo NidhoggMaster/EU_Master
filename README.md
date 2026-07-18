@@ -1,67 +1,77 @@
 # EU Master Application Manager
 
-面向欧洲硕士申请的本地管理工具，首期聚焦荷兰研究型大学。默认使用本机实体 CSV 和受控文件目录；Supabase 是可选项目目录，不保存个人档案、材料或申请。
+面向欧洲硕士申请的本地管理工具，当前聚焦荷兰研究型大学和 2027+ 入学。个人档案、课程成绩、材料、申请和评分只保存在本机；Supabase 是可选项目目录，不保存个人信息。
 
-## 主要功能
+## 功能
 
-- 个人档案、材料版本、申请要求快照与任务进度
-- 14 所荷兰研究型大学及 13 个硕士项目种子
-- 项目筛选、官网发现、手动刷新与关键字段审核
-- 本地 CSV / Supabase 项目模式切换和显式双向复制
-- 项目单行列表、双列卡片、详情与 2–4 项比较
-- ZIP 或密码加密 `.eumaster` 完整备份与恢复
-- 旧 IndexedDB 数据预览合并，旧浏览器数据库保留
+- 总览、项目目录、项目详情、2–8 项对比、项目申请与申请详情
+- 个人信息、IELTS/GRE 分项与 ETS 官方换算工具链接
+- 基本材料和项目特需材料清单；准备勾选与文件上传相互独立
+- 本地 CSV / Supabase 项目模式和显式双向复制
+- 官网事务式自动刷新、字段级来源、中文概述与历史记录
+- 竞争力、证据覆盖率、申请准备度、版本化权重与可选概率先验
+- ZIP 或密码加密 `.eumaster` 完整备份；兼容 schema v1–v3
 
 ## 一键启动
 
-需要 Node.js 20 或更高版本和 pnpm。Supabase 不是启动前提。
+需要 macOS、Node.js 20+ 和 pnpm。Supabase 不是启动前提。
 
-macOS 双击 `start-website.command`，或在终端运行：
+双击 `start-website.command`，或在终端运行：
 
 ```bash
 ./start-website.command
 ```
 
-脚本默认运行生产构建，只绑定 `127.0.0.1`。它会检查依赖和构建是否过期、复用已运行实例、初始化本地 CSV，并在 `/api/health` 通过后打开浏览器。开发模式使用：
+脚本默认运行生产构建，只绑定 `127.0.0.1`。它会检查依赖、按需构建、迁移并校验本地数据、复用健康实例、自动选择 3000–3010 端口，并在 `/api/health` 通过后打开浏览器。日志写入 `.logs/website-YYYYMMDD.log`。
+
+开发模式：
 
 ```bash
 ./start-website.command --dev
 ```
 
-手动开发流程：
-
-```bash
-pnpm install
-cp .env.example .env.local
-pnpm dev
-```
-
-默认地址是 [http://127.0.0.1:3000](http://127.0.0.1:3000)。
+默认地址：[http://127.0.0.1:3000](http://127.0.0.1:3000)
 
 ## 本地数据
 
-默认数据目录为仓库中的 `local-data/`，可通过 `EU_MASTER_DATA_DIR` 指向其他位置。目录权限为 `0700`，CSV 和材料文件为 `0600`；`local-data/` 已加入 `.gitignore`。
-
-实体文件包括：
+默认目录均位于仓库根目录，权限为目录 `0700`、文件 `0600`：
 
 ```text
-meta.csv
-profile.csv
-universities.csv
-programs.csv
-materials.csv
-material_versions.csv
-applications.csv
-source_snapshots.csv
-field_changes.csv
-files/
+Private_Data/
+├── meta.csv
+├── personal/profile.csv
+├── catalog/
+│   ├── universities.csv
+│   ├── programs.csv
+│   ├── source_snapshots.csv
+│   └── change_history.csv
+└── applications/
+    ├── applications.csv
+    ├── score_snapshots.csv
+    └── match_overrides.csv
+
+material_center/
+├── materials.csv
+├── material_versions.csv
+├── basic/<短 ID + 标题>/versions/
+└── programs/<项目 ID>/<短 ID + 标题>/versions/
 ```
 
-数组和嵌套对象以 JSON CSV 列保存。CSV 是明文，外发前应在设置页生成密码加密备份。
+复杂字段使用标准 JSON CSV 列，CSV 为明文。首次启动会把旧 `local-data/` 复制到新目录并校验，旧目录和迁移副本都保留。目录可在设置页直接于访达中显示。
 
-## 可选 Supabase
+可选覆盖：
 
-Supabase 仅保存项目、来源、刷新和审核记录。配置写入已忽略的 `.env.local`：
+```bash
+EU_MASTER_PRIVATE_DATA_DIR=/absolute/path/to/Private_Data
+EU_MASTER_MATERIAL_DIR=/absolute/path/to/material_center
+EU_MASTER_DATA_DIR=/legacy/local-data/path
+```
+
+`EU_MASTER_DATA_DIR` 仅用于旧版迁移兼容。
+
+## Supabase
+
+实际凭据只写入已忽略的 `.env.local`：
 
 ```bash
 SUPABASE_SESSION_POOLER_URL=postgresql://postgres.PROJECT_REF:URL_ENCODED_PASSWORD@aws-1-REGION.pooler.supabase.com:5432/postgres?sslmode=verify-full
@@ -69,26 +79,47 @@ SUPABASE_SESSION_POOL_MAX=3
 SUPABASE_CA_CERT_PATH=/absolute/path/to/prod-ca-2021.crt
 FIRECRAWL_API_KEY=
 EU_MASTER_BASE_URL=http://127.0.0.1:3000
-EU_MASTER_DATA_DIR=
 ```
 
-连接必须使用 Supavisor Session Pool 的 `pooler.supabase.com:5432`。应用会拆分连接串参数，并把 `SUPABASE_CA_CERT_PATH` 的 CA 传给 `pg` 执行完整证书校验；密码特殊字符必须 URL 编码。
+连接必须使用 Supavisor Session Pool `:5432`。应用拆分连接参数并把 CA 交给 `pg` 完成 `verify-full`，避免连接串中的 `sslmode` 覆盖证书配置。数据库操作使用 `eu_master_backend` 受限角色；旧远端档案表只读，远端写入仅涉及项目、来源、刷新与变更历史。
 
-控制台顶栏可切换项目模式。切换到 Supabase 前会执行健康检查，失败时保持当前模式；两套项目库只通过设置页的显式复制操作传输，不自动同步或隐式回退。个人信息永远只写入本地 CSV。
+`/api/health` 只检查本地启动与目录完整性，确保 Supabase 网络故障不会卡住一键启动；设置页和切换到 Supabase 前会通过 `/api/storage/status` 执行完整远端诊断。
 
-## 官网抓取
+## 官网刷新
 
-项目刷新先验证 HTTPS、官方域名、跳转和 robots.txt，并遵守每主机 5 秒限频、20 秒超时、2 MB HTML 上限和 24 小时项目冷却。Firecrawl 可选；未配置或失败时只能使用同样受限的合规直连，不绕过 robots、403 或 429。
+刷新只访问学校白名单 HTTPS 域名，重新验证跳转并遵守 robots.txt、每主机至少 5 秒间隔、20 秒超时、2 MB HTML 上限和 24 小时冷却。Firecrawl v2 可选，失败时只允许合规直连；不会绕过 robots、403、429、登录、验证码或付费墙。
 
-网站运行后，可逐一处理当前模式的 13 个种子项目：
+有效官网事实直接事务写入未锁定字段；无效或空解析不会删除旧数据。抓取器会递归发现国际学历 foldout、accordion、语言最低分、材料、课程、就业和 Pre-master 子页；语言小分、材料模板、申请入口等保存到精确官方子页、PDF 或 fragment，而不是只挂项目主页。旧待审核记录会归档为 `superseded` 只读历史。
+
+仓库带有 2026/27 官方基线导入，使用本地项目 API 原子写入 13 个项目的申请条件、材料、考试、课程、日期和来源：
+
+```bash
+pnpm catalog:official
+```
+
+基线中的学费和申请日期优先采用 2026/27：目录只显示短金额/日期，原文与精确链接保留在详情来源中。无法从当前官方费率表可靠确认的项目会明确显示“待官网确认”，不会用学校通用费率冒充项目金额。
+
+“双非 / 院校名单”分开保存官网规则与社区参考。官网硬条件优先；小红书、Reddit、B站、YouTube、知乎及留学论坛/平台只用于形成带证据等级的参考结论。界面会列出已检索平台和可复核链接，项目外或较旧案例不会被当成录取门槛或概率。
+
+重新抓取 13 个种子项目：
 
 ```bash
 pnpm catalog:seed
 ```
 
-脚本为每个项目记录成功、冷却跳过或失败；网络错误和 5xx 有限重试，403、429 和 robots 拒绝不重试。
+每个项目都会记录成功、冷却跳过或失败。
 
-## 检查命令
+## 评分
+
+- 目录竞争力默认：标化 30%、课程 30%、学历/GPA 20%、经历 10%、项目因素 10%
+- 申请综合指数默认：标化 25%、课程 25%、基本材料 20%、特需材料 10%、学历/GPA 10%、项目因素 10%
+- 加权几何均值对已知零分采用 5% 下限；证据覆盖低于 60% 或硬条件失败时不输出总分/概率
+- 概率必须来自带来源的基础区间；有申请/录取样本数时使用 95% Wilson 区间
+- GRE/GMAT 不在应用内换算；Tilburg 显示 ETS 换算后的 GMAT 525+ 参考，Maastricht 显示 SBE GRE 二维表与 AWA 3.5，用户换算结果仍由本人确认记录
+
+权重和项目概率先验在“设置与数据管理”中维护。每次确认保存权重版本与档案、项目、材料版本；数据变化后需要重新确认。
+
+## 验证
 
 ```bash
 pnpm lint
@@ -96,4 +127,4 @@ pnpm test
 pnpm build
 ```
 
-项目尚未接入登录认证，只适合可信本地环境运行。公开部署前必须增加认证、API 访问控制和用户级数据隔离。
+应用没有登录认证，只适合可信本地环境。公开部署前必须增加认证、API 访问控制和用户级隔离。

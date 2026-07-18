@@ -11,7 +11,7 @@ const programs = (lastFetchedAt = undefined) => new Response(JSON.stringify([
   { id: "two", name: "Two", institutionIds: ["u2"], seeded: true, status: "active" },
 ]), { status: 200, headers: { "content-type": "application/json" } });
 
-const refreshed = (provider = "firecrawl") => new Response(JSON.stringify({ provider, reviewItems: [{ id: "change" }] }), {
+const refreshed = (provider = "firecrawl") => new Response(JSON.stringify({ provider, automaticUpdates: [{ id: "change" }] }), {
   status: 200,
   headers: { "content-type": "application/json" },
 });
@@ -34,7 +34,7 @@ describe("catalog seed runner", () => {
     expect(summary.skipped).toEqual(["one"]);
     expect(summary.succeeded).toEqual(["two"]);
     expect(summary.providers).toEqual({ firecrawl: 0, direct: 1 });
-    expect(summary.pendingReview).toBe(1);
+    expect(summary.automaticUpdates).toBe(1);
   });
 
   it("retries transient server failures and then succeeds", async () => {

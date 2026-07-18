@@ -1,6 +1,6 @@
 import "server-only";
 
-import { access, chmod, mkdir, open, readFile, rename, rmdir, unlink } from "node:fs/promises";
+import { access, chmod, cp, lstat, mkdir, open, readFile, rename, rmdir, unlink } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, parse as parsePath, relative, resolve, sep } from "node:path";
 import { parse } from "csv-parse/sync";
 import { stringify } from "csv-stringify/sync";
@@ -17,6 +17,8 @@ import type {
   ProgramCategory,
   ProgramDetail,
   ProgramSource,
+  RequirementMatchOverride,
+  ScoreSnapshot,
   SourceSnapshot,
   StoredMaterialVersion,
 } from "@/lib/types";
@@ -28,6 +30,8 @@ import {
   decodeMaterialVersion,
   decodeProfile,
   decodeProgram,
+  decodeMatchOverride,
+  decodeScoreSnapshot,
   decodeSnapshot,
   decodeUniversity,
   encodeApplication,
@@ -36,6 +40,8 @@ import {
   encodeMaterialVersion,
   encodeProfile,
   encodeProgram,
+  encodeMatchOverride,
+  encodeScoreSnapshot,
   encodeSnapshot,
   encodeUniversity,
   type CsvRow,
@@ -46,40 +52,83 @@ type TableName = keyof typeof TABLE_COLUMNS;
 
 const TABLE_FILES: Record<TableName, string> = {
   meta: "meta.csv",
-  profile: "profile.csv",
-  universities: "universities.csv",
-  programs: "programs.csv",
+  profile: "personal/profile.csv",
+  universities: "catalog/universities.csv",
+  programs: "catalog/programs.csv",
   materials: "materials.csv",
   materialVersions: "material_versions.csv",
-  applications: "applications.csv",
-  sourceSnapshots: "source_snapshots.csv",
-  fieldChanges: "field_changes.csv",
+  applications: "applications/applications.csv",
+  sourceSnapshots: "catalog/source_snapshots.csv",
+  fieldChanges: "catalog/change_history.csv",
+  scoreSnapshots: "applications/score_snapshots.csv",
+  matchOverrides: "applications/match_overrides.csv",
 };
+
+const LEGACY_TABLE_FILES: Partial<Record<TableName, string>> = {
+  meta: "meta.csv", profile: "profile.csv", universities: "universities.csv", programs: "programs.csv",
+  materials: "materials.csv", materialVersions: "material_versions.csv", applications: "applications.csv",
+  sourceSnapshots: "source_snapshots.csv", fieldChanges: "field_changes.csv",
+};
+
+const MATERIAL_TABLES = new Set<TableName>(["materials", "materialVersions"]);
 
 declare global {
   var euMasterLocalStoreInit: Promise<void> | undefined;
   var euMasterLocalStoreQueue: Promise<unknown> | undefined;
 }
 
-export function localDataDirectory() {
-  const configured = process.env.EU_MASTER_DATA_DIR?.trim();
+function resolveDirectory(configured: string | undefined, fallback: string, variable: string) {
+  const value = configured?.trim();
   const directory = configured
-    ? (isAbsolute(configured) ? resolve(/* turbopackIgnore: true */ configured) : resolve(/* turbopackIgnore: true */ process.cwd(), configured))
-    : resolve(process.cwd(), "local-data");
-  if (directory === parsePath(directory).root) throw new Error("EU_MASTER_DATA_DIR 不能指向文件系统根目录。");
+    ? (isAbsolute(value!) ? resolve(/* turbopackIgnore: true */ value!) : resolve(/* turbopackIgnore: true */ process.cwd(), value!))
+    : resolve(process.cwd(), fallback);
+  if (directory === parsePath(directory).root) throw new Error(`${variable} 不能指向文件系统根目录。`);
   return directory;
 }
 
+export function privateDataDirectory() {
+  return resolveDirectory(process.env.EU_MASTER_PRIVATE_DATA_DIR ?? process.env.EU_MASTER_DATA_DIR, "Private_Data", "EU_MASTER_PRIVATE_DATA_DIR");
+}
+
+export function materialDataDirectory() {
+  const legacyOverride = process.env.EU_MASTER_DATA_DIR?.trim();
+  const fallback = legacyOverride && !process.env.EU_MASTER_PRIVATE_DATA_DIR ? join(legacyOverride, "material_center") : "material_center";
+  return resolveDirectory(process.env.EU_MASTER_MATERIAL_DIR, fallback, "EU_MASTER_MATERIAL_DIR");
+}
+
+export function localDataDirectory() {
+  return privateDataDirectory();
+}
+
+function legacyDataDirectory() {
+  return resolve(process.cwd(), "local-data");
+}
+
 function tablePath(table: TableName) {
-  return join(/* turbopackIgnore: true */ localDataDirectory(), TABLE_FILES[table]);
+  return join(/* turbopackIgnore: true */ MATERIAL_TABLES.has(table) ? materialDataDirectory() : privateDataDirectory(), TABLE_FILES[table]);
 }
 
 export function safeLocalPath(relativePath: string) {
   if (!relativePath || isAbsolute(relativePath) || relativePath.split(/[\\/]/).includes("..")) throw new Error("本地文件路径无效。");
-  const root = localDataDirectory();
+  const root = materialDataDirectory();
   const target = resolve(/* turbopackIgnore: true */ root, relativePath);
   if (target !== root && !target.startsWith(`${root}${sep}`)) throw new Error("本地文件路径超出数据目录。");
   return target;
+}
+
+async function assertNoSymlink(root: string, target: string) {
+  const value = relative(root, target);
+  if (value.startsWith("..") || isAbsolute(value)) throw new Error("本地文件路径超出数据目录。");
+  let current = root;
+  for (const part of value.split(sep).filter(Boolean)) {
+    current = join(current, part);
+    try {
+      if ((await lstat(current)).isSymbolicLink()) throw new Error("本地文件路径不能经过符号链接。");
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+      throw error;
+    }
+  }
 }
 
 async function exists(path: string) {
@@ -92,6 +141,9 @@ async function exists(path: string) {
 }
 
 async function writeFileAtomic(path: string, contents: string | Uint8Array) {
+  const root = path.startsWith(`${materialDataDirectory()}${sep}`) ? materialDataDirectory() : privateDataDirectory();
+  await assertNoSymlink(root, dirname(path));
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const temporary = `${path}.${crypto.randomUUID()}.tmp`;
   let handle;
   try {
@@ -115,15 +167,39 @@ async function writeRows(table: TableName, rows: CsvRow[]) {
   await writeFileAtomic(tablePath(table), output);
 }
 
+async function migrateLegacyStore() {
+  if (process.env.EU_MASTER_DATA_DIR || process.env.EU_MASTER_PRIVATE_DATA_DIR || process.env.EU_MASTER_MATERIAL_DIR) return false;
+  const legacy = legacyDataDirectory();
+  if (!(await exists(join(legacy, "meta.csv"))) || await exists(join(privateDataDirectory(), "meta.csv"))) return false;
+  await mkdir(join(privateDataDirectory(), "migrations", "legacy-local-data"), { recursive: true, mode: 0o700 });
+  await cp(legacy, join(privateDataDirectory(), "migrations", "legacy-local-data"), { recursive: true, force: false, errorOnExist: false });
+  for (const [table, legacyName] of Object.entries(LEGACY_TABLE_FILES) as Array<[TableName, string]>) {
+    const source = join(legacy, legacyName);
+    if (!(await exists(source))) continue;
+    const target = tablePath(table);
+    await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+    await cp(source, target, { force: false, errorOnExist: false });
+    await chmod(target, 0o600);
+  }
+  if (await exists(join(legacy, "files"))) await cp(join(legacy, "files"), join(materialDataDirectory(), "files"), { recursive: true, force: false, errorOnExist: false });
+  return true;
+}
+
 async function initializeStore() {
-  const root = localDataDirectory();
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  await chmod(root, 0o700);
-  await mkdir(join(root, "files"), { recursive: true, mode: 0o700 });
-  await chmod(join(root, "files"), 0o700);
+  const privateRoot = privateDataDirectory();
+  const materialRoot = materialDataDirectory();
+  await mkdir(privateRoot, { recursive: true, mode: 0o700 });
+  await mkdir(materialRoot, { recursive: true, mode: 0o700 });
+  await chmod(privateRoot, 0o700);
+  await chmod(materialRoot, 0o700);
+  for (const directory of ["basic", "programs", "files"]) {
+    await mkdir(join(materialRoot, directory), { recursive: true, mode: 0o700 });
+    await chmod(join(materialRoot, directory), 0o700);
+  }
+  const migrated = await migrateLegacyStore();
 
   const initialRows: Record<TableName, CsvRow[]> = {
-    meta: [{ key: "schemaVersion", value: "1" }, { key: "catalogMode", value: "local" }],
+    meta: [{ key: "schemaVersion", value: "3" }, { key: "catalogMode", value: "local" }, { key: "migratedFromLegacy", value: String(migrated) }],
     profile: [],
     universities: seededUniversities.map(encodeUniversity),
     programs: seededPrograms.map(encodeProgram),
@@ -132,10 +208,20 @@ async function initializeStore() {
     applications: [],
     sourceSnapshots: [],
     fieldChanges: [],
+    scoreSnapshots: [],
+    matchOverrides: [],
   };
   for (const table of Object.keys(TABLE_FILES) as TableName[]) {
     if (!(await exists(tablePath(table)))) await writeRows(table, initialRows[table]);
   }
+  const meta = await readFile(tablePath("meta"), "utf8");
+  const metaRows = parse(meta, { bom: true, columns: true, skip_empty_lines: true }) as CsvRow[];
+  const nextMeta = metaRows.filter((row) => !["schemaVersion", "migratedFromLegacy"].includes(row.key));
+  nextMeta.push({ key: "schemaVersion", value: "3" }, { key: "migratedFromLegacy", value: String(migrated || metaRows.some((row) => row.key === "migratedFromLegacy" && row.value === "true")) });
+  await writeRows("meta", nextMeta);
+  const changeInput = await readFile(tablePath("fieldChanges"), "utf8");
+  const changeRows = parse(changeInput, { bom: true, columns: true, skip_empty_lines: true }) as CsvRow[];
+  if (changeRows.some((row) => row.status === "pending")) await writeRows("fieldChanges", changeRows.map((row) => row.status === "pending" ? { ...row, status: "superseded" } : row));
 }
 
 export function ensureLocalStore() {
@@ -278,6 +364,9 @@ export function upsertLocalCandidate(input: { id?: string; universityId: string;
       tuitionAcademicYear: "", applicationFee: "", applicationFeeEur: null, applicationPlatform: "", premaster: "", quota: "", campusName: "", city: "",
       campusArea: "", locationNotes: "", coreCourses: [], admissionCriteria: [], requirements: [], dataCompleteness: 0,
       status: input.status ?? "candidate", lastFetchedAt: undefined, createdAt: timestamp, updatedAt: timestamp, seeded: false,
+      overview: null, rankings: [], careerOutcomes: [], applicationDates: [], testRequirements: [], chinaEligibility: null,
+      premasterInfo: null, applicationLinks: { programUrl: input.sourceUrl, curriculumUrl: "", eligibilityUrl: "", materialsUrl: "", careersUrl: "", premasterUrl: "", studielinkUrl: "https://www.studielink.nl/" },
+      admissionProbabilityPrior: null, fieldLocks: [],
     };
     await writeTable("programs", [...programs.filter((item) => item.id !== program.id), program], encodeProgram);
     return getLocalProgramDetail(program.id) as Promise<ProgramDetail>;
@@ -322,30 +411,52 @@ export async function getLocalMaterialVersions(materialId: string) {
 }
 
 function safeFileName(value: string) {
-  const cleaned = basename(value).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 160);
+  const cleaned = basename(value).normalize("NFC").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 160);
   return cleaned || "file.bin";
 }
 
-async function storeMaterialBytes(versionId: string, fileName: string, bytes: Uint8Array) {
-  const directory = safeLocalPath(join("files", versionId));
+function materialFolder(material: Material | undefined) {
+  if (!material) return "files";
+  const label = `${material.id.slice(0, 8)} ${safeFileName(material.title)}`;
+  return material.scope === "program" && material.programId ? join("programs", safeFileName(material.programId), label) : join("basic", label);
+}
+
+async function storeMaterialBytes(versionId: string, fileName: string, bytes: Uint8Array, material?: Material, versionNumber = 1) {
+  const folder = materialFolder(material);
+  const directory = safeLocalPath(join(folder, material ? "versions" : versionId));
+  await assertNoSymlink(materialDataDirectory(), directory);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);
-  const storedName = safeFileName(fileName);
-  const relativePath = join("files", versionId, storedName);
+  const storedName = material ? `v${String(versionNumber).padStart(3, "0")}--${safeFileName(fileName)}` : safeFileName(fileName);
+  const relativePath = join(folder, material ? "versions" : versionId, storedName);
   await writeFileAtomic(safeLocalPath(relativePath), bytes);
   return relativePath;
 }
 
-export function createLocalMaterial(title: string, type: MaterialType, status: Material["status"], file: { name: string; mimeType: string; bytes: Uint8Array }) {
+export function createLocalMaterial(
+  title: string,
+  type: MaterialType,
+  status: Material["status"],
+  file?: { name: string; mimeType: string; bytes: Uint8Array },
+  options: { scope?: Material["scope"]; programId?: string; requirementId?: string; prepared?: boolean; notes?: string } = {},
+) {
   return serializeWrite(async () => {
     const [materials, versions] = await Promise.all([getLocalMaterials(), readTable("materialVersions", decodeMaterialVersion)]);
     const timestamp = new Date().toISOString();
     const materialId = crypto.randomUUID();
-    const versionId = crypto.randomUUID();
-    const filePath = await storeMaterialBytes(versionId, file.name, file.bytes);
-    const material: Material = { id: materialId, title, type, status, currentVersionId: versionId, createdAt: timestamp, updatedAt: timestamp };
-    const version: StoredVersionRecord = { id: versionId, materialId, version: 1, fileName: file.name, mimeType: file.mimeType, size: file.bytes.byteLength, filePath, createdAt: timestamp };
-    await writeTable("materialVersions", [...versions, version], encodeMaterialVersion);
+    const material: Material = {
+      id: materialId, title, type, status, currentVersionId: "", createdAt: timestamp, updatedAt: timestamp,
+      scope: options.scope ?? "basic", programId: options.programId ?? "", requirementId: options.requirementId ?? "",
+      prepared: options.prepared ?? status === "ready", notes: options.notes ?? "", archived: false,
+    };
+    let nextVersions = versions;
+    if (file) {
+      const versionId = crypto.randomUUID();
+      const filePath = await storeMaterialBytes(versionId, file.name, file.bytes, material, 1);
+      material.currentVersionId = versionId;
+      nextVersions = [...versions, { id: versionId, materialId, version: 1, fileName: file.name, mimeType: file.mimeType, size: file.bytes.byteLength, filePath, createdAt: timestamp }];
+    }
+    await writeTable("materialVersions", nextVersions, encodeMaterialVersion);
     await writeTable("materials", [...materials, material], encodeMaterial);
     return material;
   });
@@ -358,8 +469,9 @@ export function addLocalMaterialVersion(materialId: string, file: { name: string
     if (!material) throw new Error("找不到这份材料。");
     const timestamp = new Date().toISOString();
     const id = crypto.randomUUID();
-    const filePath = await storeMaterialBytes(id, file.name, file.bytes);
-    const version: StoredVersionRecord = { id, materialId, version: Math.max(0, ...versions.filter((item) => item.materialId === materialId).map((item) => item.version)) + 1, fileName: file.name, mimeType: file.mimeType, size: file.bytes.byteLength, filePath, createdAt: timestamp };
+    const versionNumber = Math.max(0, ...versions.filter((item) => item.materialId === materialId).map((item) => item.version)) + 1;
+    const filePath = await storeMaterialBytes(id, file.name, file.bytes, material, versionNumber);
+    const version: StoredVersionRecord = { id, materialId, version: versionNumber, fileName: file.name, mimeType: file.mimeType, size: file.bytes.byteLength, filePath, createdAt: timestamp };
     await writeTable("materialVersions", [...versions, version], encodeMaterialVersion);
     await writeTable("materials", materials.map((item) => item.id === materialId ? { ...item, currentVersionId: id, updatedAt: timestamp } : item), encodeMaterial);
     return withDownloadUrl(version);
@@ -377,7 +489,10 @@ export function updateLocalMaterial(material: Material) {
 
 export function deleteLocalMaterial(materialId: string) {
   return serializeWrite(async () => {
-    const [materials, versions] = await Promise.all([getLocalMaterials(), readTable("materialVersions", decodeMaterialVersion)]);
+    const [materials, versions, applications] = await Promise.all([getLocalMaterials(), readTable("materialVersions", decodeMaterialVersion), getLocalApplications()]);
+    if (applications.some((application) => application.requirements.some((requirement) => requirement.materialId === materialId))) {
+      throw Object.assign(new Error("该材料仍被申请引用，请先解除关联。"), { status: 409 });
+    }
     const removed = versions.filter((item) => item.materialId === materialId);
     await writeTable("materials", materials.filter((item) => item.id !== materialId), encodeMaterial);
     await writeTable("materialVersions", versions.filter((item) => item.materialId !== materialId), encodeMaterialVersion);
@@ -392,7 +507,9 @@ export function deleteLocalMaterial(materialId: string) {
 export async function readLocalMaterialFile(versionId: string) {
   const version = (await readTable("materialVersions", decodeMaterialVersion)).find((item) => item.id === versionId);
   if (!version) return undefined;
-  return { version: withDownloadUrl(version), bytes: await readFile(/* turbopackIgnore: true */ safeLocalPath(version.filePath)) };
+  const path = safeLocalPath(version.filePath);
+  await assertNoSymlink(materialDataDirectory(), path);
+  return { version: withDownloadUrl(version), bytes: await readFile(/* turbopackIgnore: true */ path) };
 }
 
 export async function getLocalApplications() {
@@ -416,6 +533,37 @@ export function saveLocalApplication(application: Application) {
 export function deleteLocalApplication(id: string) {
   return serializeWrite(async () => {
     await writeTable("applications", (await getLocalApplications()).filter((item) => item.id !== id), encodeApplication);
+  });
+}
+
+export async function getLocalScoreSnapshots(programIds?: string[]) {
+  const snapshots = await readTable("scoreSnapshots", decodeScoreSnapshot);
+  const filter = programIds?.length ? new Set(programIds) : undefined;
+  return snapshots.filter((item) => !filter || filter.has(item.programId)).sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt));
+}
+
+export function saveLocalScoreSnapshots(values: ScoreSnapshot[]) {
+  return serializeWrite(async () => {
+    const current = await readTable("scoreSnapshots", decodeScoreSnapshot);
+    const replaced = new Set(values.map((item) => item.id));
+    const next = [...current.filter((item) => !replaced.has(item.id)), ...values];
+    await writeTable("scoreSnapshots", next, encodeScoreSnapshot);
+    return values;
+  });
+}
+
+export async function getLocalMatchOverrides(programIds?: string[]) {
+  const values = await readTable("matchOverrides", decodeMatchOverride);
+  const filter = programIds?.length ? new Set(programIds) : undefined;
+  return values.filter((item) => !filter || filter.has(item.programId));
+}
+
+export function saveLocalMatchOverride(value: RequirementMatchOverride) {
+  return serializeWrite(async () => {
+    const current = await readTable("matchOverrides", decodeMatchOverride);
+    const next = { ...value, updatedAt: new Date().toISOString() };
+    await writeTable("matchOverrides", [...current.filter((item) => item.id !== value.id && !(item.programId === value.programId && item.criterionId === value.criterionId)), next], encodeMatchOverride);
+    return next;
   });
 }
 
@@ -563,9 +711,10 @@ export function importLocalCatalog(details: ProgramDetail[], overwriteIds: strin
 }
 
 export async function readLocalBackupRecords(): Promise<{ records: BackupRecords; versions: StoredVersionRecord[] }> {
-  const [profile, universities, programs, materials, versions, applications, sourceSnapshots, fieldChanges] = await Promise.all([
+  const [profile, universities, programs, materials, versions, applications, sourceSnapshots, fieldChanges, scoreSnapshots, matchOverrides] = await Promise.all([
     getLocalProfile(), listLocalUniversities(), allLocalPrograms(), getLocalMaterials(), readTable("materialVersions", decodeMaterialVersion),
     getLocalApplications(), readTable("sourceSnapshots", decodeSnapshot), readTable("fieldChanges", decodeFieldChange),
+    getLocalScoreSnapshots(), getLocalMatchOverrides(),
   ]);
   return {
     records: {
@@ -575,7 +724,7 @@ export async function readLocalBackupRecords(): Promise<{ records: BackupRecords
         delete metadata.filePath;
         return metadata as Omit<StoredVersionRecord, "filePath">;
       }),
-      applications, sourceSnapshots, fieldChanges,
+      applications, sourceSnapshots, fieldChanges, scoreSnapshots, matchOverrides,
     },
     versions,
   };
@@ -591,9 +740,10 @@ function mergeById<T extends { id: string }>(current: T[], incoming: T[], replac
 
 export function importLocalBackupRecords(records: BackupRecords, importedVersions: ImportedVersion[], replace = false) {
   return serializeWrite(async () => {
-    const [currentProfile, currentUniversities, currentPrograms, currentMaterials, currentVersions, currentApplications, currentSnapshots, currentChanges] = await Promise.all([
+    const [currentProfile, currentUniversities, currentPrograms, currentMaterials, currentVersions, currentApplications, currentSnapshots, currentChanges, currentScores, currentOverrides] = await Promise.all([
       getLocalProfile(), listLocalUniversities(), allLocalPrograms(), getLocalMaterials(), readTable("materialVersions", decodeMaterialVersion),
       getLocalApplications(), readTable("sourceSnapshots", decodeSnapshot), readTable("fieldChanges", decodeFieldChange),
+      getLocalScoreSnapshots(), getLocalMatchOverrides(),
     ]);
 
     const profile = records.profile ? decodeProfile(encodeProfile(records.profile)) : undefined;
@@ -603,6 +753,8 @@ export function importLocalBackupRecords(records: BackupRecords, importedVersion
     const applications = records.applications.map((item) => decodeApplication(encodeApplication(item)));
     const snapshots = records.sourceSnapshots.map((item) => decodeSnapshot(encodeSnapshot(item)));
     const changes = records.fieldChanges.map((item) => decodeFieldChange(encodeFieldChange(item)));
+    const scores = (records.scoreSnapshots ?? []).map((item) => decodeScoreSnapshot(encodeScoreSnapshot(item)));
+    const overrides = (records.matchOverrides ?? []).map((item) => decodeMatchOverride(encodeMatchOverride(item)));
 
     const incomingStored: StoredVersionRecord[] = [];
     for (const version of importedVersions) {
@@ -617,6 +769,8 @@ export function importLocalBackupRecords(records: BackupRecords, importedVersion
     const nextApplications = mergeById(currentApplications, applications, replace);
     const nextSnapshots = mergeById(currentSnapshots, snapshots, replace);
     const nextChanges = mergeById(currentChanges, changes, replace);
+    const nextScores = mergeById(currentScores, scores, replace);
+    const nextOverrides = mergeById(currentOverrides, overrides, replace);
 
     if (profile && (replace || !currentProfile)) await writeTable("profile", [profile], encodeProfile);
     await writeTable("universities", nextUniversities, encodeUniversity);
@@ -626,6 +780,8 @@ export function importLocalBackupRecords(records: BackupRecords, importedVersion
     await writeTable("applications", nextApplications, encodeApplication);
     await writeTable("sourceSnapshots", nextSnapshots, encodeSnapshot);
     await writeTable("fieldChanges", nextChanges, encodeFieldChange);
+    await writeTable("scoreSnapshots", nextScores, encodeScoreSnapshot);
+    await writeTable("matchOverrides", nextOverrides, encodeMatchOverride);
 
     if (replace) {
       const kept = new Set(nextVersions.map((item) => item.id));
@@ -646,10 +802,4 @@ export function importLocalBackupRecords(records: BackupRecords, importedVersion
 export async function localStoreCounts() {
   const [universities, programs] = await Promise.all([listLocalUniversities(), allLocalPrograms()]);
   return { universities: universities.length, programs: programs.length };
-}
-
-export function relativeLocalPath(path: string) {
-  const value = relative(localDataDirectory(), path);
-  safeLocalPath(value);
-  return value;
 }
