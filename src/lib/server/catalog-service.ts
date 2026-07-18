@@ -27,6 +27,7 @@ import {
   recordLocalRefreshFailure,
   setCatalogMode,
   updateLocalProgram,
+  updateLocalUniversity,
   upsertLocalCandidate,
 } from "./local-store";
 
@@ -41,6 +42,10 @@ export function listUniversities() {
 
 export function getUniversity(id: string) {
   return getLocalUniversity(id);
+}
+
+export function updateUniversity(university: Parameters<typeof updateLocalUniversity>[0]) {
+  return updateLocalUniversity(university);
 }
 
 export async function listPrograms(filters: Filters = {}) {

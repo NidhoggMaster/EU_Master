@@ -102,6 +102,7 @@ scripts/apply-official-catalog-2026.mjs     13 项目 2026/27 官方深层页面
 解析只是启发式提取。费用、日期、录取条件、语言小分和材料要求必须保存原文、中文概述、精确页面链接或官方 fragment 以及抓取时间；官网未披露时不得估算硬条件。
 
 - 学费和日期优先使用 2026/27 精确值，列表与详情首屏只显示短金额/日期；长原文留在来源事实。项目费率无法可靠确认时必须标为待确认，不能用学校通用费率冒充项目金额。
+- Tilburg 2026/27 项目费率以官网费率表为依据，并保留官方 Tuition Fee Roadmap（Landbot）供后续个案复核；Information Management、Data Science and Society、Data Science in Business and Entrepreneurship 当前机构学费均为 €23,900。Tilburg 生活费按官网 €1,000–€1,200/月保存。
 - 中国院校背景必须区分官网硬规则与社区参考。小红书、Reddit、B站、YouTube、知乎和留学平台样本保存检索范围、链接、项目相关性与证据等级；个案只能证明“曾有样本”，不能生成硬门槛或概率。
 
 ## 8. 项目、申请与材料
