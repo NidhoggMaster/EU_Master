@@ -49,6 +49,13 @@ function tuitionLabel(program: Program) {
   return program.tuition.includes("待官网确认") ? "待确认" : "未披露";
 }
 
+function rankingLabel(program: Program) {
+  const world = program.rankings.filter((ranking) => ranking.scope === "university").map((ranking) => ranking.rank);
+  const subjects = program.rankings.filter((ranking) => ranking.scope === "subject").map((ranking) => ranking.rank);
+  if (!world.length && !subjects.length) return "QS 排名待录入";
+  return [`QS 2027 ${world.join(" / ")}`, subjects.length ? `相关学科 2026 ${subjects.join(" / ")}` : ""].filter(Boolean).join(" · ");
+}
+
 export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [universities, setUniversities] = useState<University[]>([]);
@@ -252,6 +259,16 @@ export default function ProgramsPage() {
         <span>{loading ? "读取中" : `${displayedPrograms.length} 个项目`}</span>
       </section>
 
+      <section className="dashboard-panel ranking-overview" aria-labelledby="ranking-overview-title">
+        <div><span className="panel-label">QS 2026 相关学科</span><h2 id="ranking-overview-title">申请方向速览</h2></div>
+        <div className="ranking-overview-grid">
+          <article><strong>第一梯队</strong><p>UvA Information Studies 的 Data Science、Information 与 CS 三个口径最强。</p></article>
+          <article><strong>第二梯队</strong><p>VU Information Sciences / DBI、Utrecht Business Informatics、TU/e + Tilburg JADS。</p></article>
+          <article><strong>商科更强</strong><p>Tilburg Information Management 应按管理信息系统判断；商科与经济排名明显强于纯 CS。</p></article>
+          <article><strong>结合匹配度</strong><p>Maastricht、Twente、Radboud 更应同时看课程、录取匹配、就业地点与实习资源。</p></article>
+        </div>
+      </section>
+
       {loading ? <div className="empty-state">正在读取项目目录…</div> : displayedPrograms.length ? (
         <div className={`catalog-results catalog-results-${viewMode}`}>
           {displayedPrograms.map((program) => {
@@ -267,6 +284,7 @@ export default function ProgramsPage() {
                 <span>{schools.map((item) => item.shortName).join(" + ") || "待关联学校"} · {program.city || school?.city || "地点未披露"}</span>
                 <h2><a href={program.applicationLinks.programUrl || program.sourceUrl} target="_blank" rel="noreferrer">{program.name}<ExternalLink size={14} aria-hidden="true" /></a></h2>
                 <small>{program.categories.map((item) => CATEGORY_LABELS[item]).join(" / ")} · 完整度 {program.dataCompleteness}%</small>
+                <small className="catalog-program-ranking">{rankingLabel(program)}</small>
               </div>
               <dl className="catalog-program-facts">
                 <div><dt>学制</dt><dd>{program.duration || "未披露"}</dd></div>

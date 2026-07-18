@@ -8,6 +8,7 @@ import type {
   ProgramCategory,
   ProgramDetail,
   ProgramSource,
+  RankingFact,
   University,
 } from "@/lib/types";
 import { withDb } from "./postgres";
@@ -149,6 +150,22 @@ export async function updateProgram(program: Program) {
       JSON.stringify(program.premasterInfo), JSON.stringify(program.applicationLinks), JSON.stringify(program.admissionProbabilityPrior), program.fieldLocks,
     ]);
     return detailWithClient(client, program.id);
+  });
+}
+
+export async function updateProgramRankings(rankingsByProgram: Record<string, RankingFact[]>, updatedAt: string) {
+  return withDb(async (client) => {
+    let programs = 0;
+    for (const [programId, rankings] of Object.entries(rankingsByProgram)) {
+      const result = await client.query(`update private.programs
+        set rankings=$2,
+            field_locks=case when 'rankings'=any(field_locks) then field_locks else array_append(field_locks,'rankings') end,
+            updated_at=$3
+        where id=$1`, [programId, JSON.stringify(rankings), updatedAt]);
+      if (result.rowCount !== 1) throw new Error(`Supabase 中找不到排名目标项目：${programId}`);
+      programs += 1;
+    }
+    return { programs };
   });
 }
 

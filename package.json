@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "catalog:seed": "node scripts/seed-catalog.mjs",
-    "catalog:official": "node scripts/apply-official-catalog-2026.mjs"
+    "catalog:official": "node scripts/apply-official-catalog-2026.mjs",
+    "catalog:rankings": "node scripts/apply-qs-rankings-2027.mjs"
   },
   "dependencies": {
     "@next/env": "16.2.10",

@@ -17,6 +17,7 @@ import type {
   ProgramCategory,
   ProgramDetail,
   ProgramSource,
+  RankingFact,
   RequirementMatchOverride,
   ScoreSnapshot,
   SourceSnapshot,
@@ -311,6 +312,37 @@ export async function listLocalPrograms(filters: { universityId?: string; catego
 
 async function allLocalPrograms() {
   return readTable("programs", decodeProgram);
+}
+
+export function updateLocalRankingData(
+  universityRankings: Record<string, RankingFact[]>,
+  programRankings: Record<string, RankingFact[]>,
+  updatedAt: string,
+) {
+  return serializeWrite(async () => {
+    const [universities, programs] = await Promise.all([listLocalUniversities(), allLocalPrograms()]);
+    const universityIds = new Set(universities.map((item) => item.id));
+    const programIds = new Set(programs.map((item) => item.id));
+    const missingUniversities = Object.keys(universityRankings).filter((id) => !universityIds.has(id));
+    const missingPrograms = Object.keys(programRankings).filter((id) => !programIds.has(id));
+    if (missingUniversities.length || missingPrograms.length) {
+      throw new Error(`排名目标不存在：${[...missingUniversities, ...missingPrograms].join("、")}`);
+    }
+    const nextUniversities = universities.map((item) => universityRankings[item.id]
+      ? { ...item, rankings: universityRankings[item.id].map((ranking) => ({ ...ranking })) }
+      : item);
+    const nextPrograms = programs.map((item) => programRankings[item.id]
+      ? {
+          ...item,
+          rankings: programRankings[item.id].map((ranking) => ({ ...ranking })),
+          fieldLocks: [...new Set([...item.fieldLocks, "rankings"])],
+          updatedAt,
+        }
+      : item);
+    await writeTable("universities", nextUniversities, encodeUniversity);
+    await writeTable("programs", nextPrograms, encodeProgram);
+    return { universities: Object.keys(universityRankings).length, programs: Object.keys(programRankings).length };
+  });
 }
 
 function snapshotToSource(snapshot: SourceSnapshot, program: Program) {
