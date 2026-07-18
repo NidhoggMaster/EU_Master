@@ -155,6 +155,7 @@ export interface ProgramLinks {
   premasterUrl: string;
   studielinkUrl: string;
   tuitionUrl?: string;
+  tuitionCalculatorUrl?: string;
 }
 
 export interface AdmissionProbabilityPrior {

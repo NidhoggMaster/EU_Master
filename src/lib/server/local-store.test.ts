@@ -62,6 +62,21 @@ describe("local CSV store", () => {
     expect(await readFile(join(directory, "meta.csv"), "utf8")).toContain("catalogMode,supabase");
   });
 
+  it("stores verified university living-cost facts through the atomic CSV writer", async () => {
+    const current = await store.getLocalUniversity("tilburg");
+    expect(current).toBeDefined();
+    const updated = await store.updateLocalUniversity({
+      ...current!,
+      livingCostMonthlyMinEur: 1000,
+      livingCostMonthlyMaxEur: 1200,
+      livingCostSourceUrl: "https://www.tilburguniversity.edu/education/masters-programs/tuition-fees-scholarships",
+      factsFetchedAt: "2026-07-19T00:00:00.000Z",
+    });
+    expect(updated?.livingCostMonthlyMinEur).toBe(1000);
+    expect(updated?.livingCostMonthlyMaxEur).toBe(1200);
+    expect((await readdir(join(directory, "catalog"))).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+
   it("rejects path traversal and absolute material paths", () => {
     expect(() => store.safeLocalPath("../profile.csv")).toThrow("路径无效");
     expect(() => store.safeLocalPath("/tmp/file")).toThrow("路径无效");

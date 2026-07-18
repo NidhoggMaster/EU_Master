@@ -1,6 +1,7 @@
 import type { Program, ProgramCategory, University } from "./types";
 
 const now = "2026-07-17T00:00:00.000Z";
+const TILBURG_LIVING_COST_URL = "https://www.tilburguniversity.edu/education/masters-programs/tuition-fees-scholarships#:~:text=Estimated%20monthly%20costs,200%C2%A0per%20year";
 
 export const universities: University[] = [
   { id: "uva", name: "University of Amsterdam", shortName: "UvA", city: "Amsterdam", country: "NL", homepageUrl: "https://www.uva.nl/en", catalogUrl: "https://www.uva.nl/en/education/master-s/master-s-programmes/masters-programmes.html", allowedHosts: ["uva.nl", "www.uva.nl"] },
@@ -28,6 +29,13 @@ for (const university of universities) {
     livingCostMonthlyMaxEur: null,
   });
 }
+
+Object.assign(universities.find((university) => university.id === "tilburg")!, {
+  livingCostMonthlyMinEur: 1000,
+  livingCostMonthlyMaxEur: 1200,
+  livingCostSourceUrl: TILBURG_LIVING_COST_URL,
+  factsFetchedAt: "2026-07-19T00:00:00.000Z",
+});
 
 function program(
   id: string,

@@ -21,6 +21,7 @@ import type {
   ScoreSnapshot,
   SourceSnapshot,
   StoredMaterialVersion,
+  University,
 } from "@/lib/types";
 import {
   TABLE_COLUMNS,
@@ -297,6 +298,15 @@ export async function listLocalUniversities() {
 
 export async function getLocalUniversity(id: string) {
   return (await listLocalUniversities()).find((item) => item.id === id);
+}
+
+export function updateLocalUniversity(university: University) {
+  return serializeWrite(async () => {
+    const universities = await listLocalUniversities();
+    if (!universities.some((item) => item.id === university.id)) throw new Error("找不到学校。");
+    await writeTable("universities", [...universities.filter((item) => item.id !== university.id), university], encodeUniversity);
+    return getLocalUniversity(university.id) as Promise<University>;
+  });
 }
 
 export async function listLocalPrograms(filters: { universityId?: string; category?: ProgramCategory; status?: Program["status"] } = {}) {
