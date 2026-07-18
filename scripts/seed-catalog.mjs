@@ -36,6 +36,17 @@ async function getJson(fetchImpl, url) {
   return body;
 }
 
+async function recordCooldownSkip(fetchImpl, origin, program) {
+  const response = await fetchImpl(new URL("/api/catalog/collection-skip", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ programId: program.id, lastFetchedAt: program.lastFetchedAt }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const body = await readJson(response);
+  if (!response.ok) throw new Error(body.error || `无法记录 ${program.id} 的冷却跳过结果。`);
+}
+
 async function refreshWithRetry({ fetchImpl, url, retryDelays, waitImpl }) {
   for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
     let response;
@@ -72,13 +83,8 @@ export async function runCatalogSeed({
   logger = console,
 } = {}) {
   const origin = new URL(baseUrl.replace(/\/$/, ""));
-  const health = await getJson(fetchImpl, new URL("/api/catalog/health", origin));
-  if (!health.database?.connected || !health.database?.restrictedRole) {
-    throw new Error("数据库未通过受限角色健康检查。");
-  }
-  if (!health.firecrawl?.configured) {
-    throw new Error("服务端尚未配置 FIRECRAWL_API_KEY，首次种子任务已停止。");
-  }
+  const health = await getJson(fetchImpl, new URL("/api/health", origin));
+  if (health.status !== "ready" || !health.storage?.local?.ready) throw new Error("本地 CSV 存储未通过健康检查。");
 
   const catalog = await getJson(fetchImpl, new URL("/api/catalog/programs", origin));
   if (!Array.isArray(catalog)) throw new Error("项目目录接口返回了无效数据。");
@@ -102,12 +108,14 @@ export async function runCatalogSeed({
     pendingReview: 0,
   };
 
-  logger.log(`[catalog:seed] 健康检查通过，共 ${programs.length} 个预置项目。`);
+  logger.log(`[catalog:seed] ${health.storage.catalogMode} 模式健康检查通过，共 ${programs.length} 个预置项目。`);
+  if (!health.storage.firecrawl?.configured) logger.log("[catalog:seed] Firecrawl 未配置，将使用合规直连。");
   let attempted = 0;
   for (const program of programs) {
-    if (program.lastFetchedAt) {
+    if (program.lastFetchedAt && Date.now() - new Date(program.lastFetchedAt).getTime() < 24 * 60 * 60 * 1000) {
+      await recordCooldownSkip(fetchImpl, origin, program);
       summary.skipped.push(program.id);
-      logger.log(`[skip] ${program.id}: 已完成首次抓取`);
+      logger.log(`[skip] ${program.id}: 仍在 24 小时冷却期`);
       continue;
     }
     if (attempted > 0 && delayMs > 0) await waitImpl(delayMs);

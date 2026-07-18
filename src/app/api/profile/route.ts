@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { applicantProfileSchema } from "@/lib/profile-schema";
-import { getStoredProfile, upsertStoredProfile } from "@/lib/profile-postgres";
+import { assertLocalMutation } from "@/lib/server/local-api";
+import { getLocalProfile, saveLocalProfile } from "@/lib/server/local-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,25 +17,26 @@ function response(body: object, status = 200) {
 }
 
 function serverError(reason: unknown) {
-  console.error("Profile API database operation failed", reason);
-  const configurationError = reason instanceof Error
-    && reason.message.includes("SUPABASE_SESSION_POOL");
+  console.error("Profile local storage operation failed", reason);
   return response({
-    error: configurationError
-      ? reason.message
-      : "个人档案数据库暂时不可用，请稍后重试。",
+    error: reason instanceof Error ? reason.message : "个人档案本地存储暂时不可用，请稍后重试。",
   }, 503);
 }
 
 export async function GET() {
   try {
-    return response({ profile: await getStoredProfile() });
+    return response({ profile: await getLocalProfile() });
   } catch (reason) {
     return serverError(reason);
   }
 }
 
 export async function PUT(request: Request) {
+  try {
+    assertLocalMutation(request);
+  } catch (reason) {
+    return response({ error: reason instanceof Error ? reason.message : "请求来源无效。" }, 403);
+  }
   const contentLength = Number(request.headers.get("content-length") || "0");
   if (contentLength > MAX_PROFILE_BYTES) {
     return response({ error: "个人档案数据不能超过 256 KB。" }, 413);
@@ -49,7 +51,7 @@ export async function PUT(request: Request) {
       return response({ error: "个人档案数据不能超过 256 KB。" }, 413);
     }
     const profile = applicantProfileSchema.parse(JSON.parse(rawBody));
-    return response({ profile: await upsertStoredProfile(profile) });
+    return response({ profile: await saveLocalProfile(profile) });
   } catch (reason) {
     if (reason instanceof SyntaxError) {
       return response({ error: "请求 JSON 格式不正确。" }, 400);

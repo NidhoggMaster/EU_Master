@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getApplication, getMaterials, saveApplication } from "@/lib/db";
 import { getProgram } from "@/lib/catalog-client";
 import { applicationProgress } from "@/lib/progress";
 import { MATERIAL_TYPE_LABELS, type Application, type Material, type Program } from "@/lib/types";
+import { getApplication, getMaterials, saveApplication } from "@/lib/workspace-client";
 
 const statusLabels: Record<Application["status"], string> = {
   planning: "规划中", preparing: "准备中", submitted: "已提交", offer: "已录取", rejected: "未录取", withdrawn: "已撤回",

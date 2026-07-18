@@ -33,6 +33,7 @@
 .DS_Store
 Thumbs.db
 *.pem
+*.crt
 *.log
 *.swp
 
@@ -50,6 +51,7 @@ yarn-error.log*
 *.eumaster
 /backups/
 /uploads/
+/local-data/
 
 # vercel
 .vercel

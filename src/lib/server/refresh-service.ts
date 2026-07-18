@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Program } from "@/lib/types";
 import { refreshProgramForUniversity } from "@/lib/catalog-server";
-import { getProgramDetail, recordRefresh, recordRefreshFailure, updateProgram } from "./catalog-repository";
+import { getProgramDetail, recordRefresh, recordRefreshFailure, updateProgram } from "./catalog-service";
 
 declare global { var euMasterRefreshLocks: Set<string> | undefined; }
 const locks = globalThis.euMasterRefreshLocks ?? new Set<string>();

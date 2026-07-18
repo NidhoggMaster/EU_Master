@@ -296,17 +296,22 @@ export async function saveFieldChange(change: FieldChange) {
 
 export async function readBackupRecords(): Promise<{ records: BackupRecords; versions: MaterialVersion[] }> {
   const db = await ensureDatabase();
-  const [materials, versions, applications, catalogTableRows] = await Promise.all([
+  const [profile, universities, programs, materials, versions, applications, sourceSnapshots, fieldChanges, catalogTableRows] = await Promise.all([
+    db.get("profile", "current"),
+    db.getAll("universities"),
+    db.getAll("programs"),
     db.getAll("materials"),
     db.getAll("materialVersions"),
     db.getAll("applications"),
+    db.getAll("sourceSnapshots"),
+    db.getAll("fieldChanges"),
     db.getAll("catalogTable"),
   ]);
   return {
     records: {
-      profile: undefined,
-      universities: [],
-      programs: [],
+      profile,
+      universities,
+      programs,
       materials,
       materialVersions: versions.map((version) => {
         const metadata = { ...version } as Partial<MaterialVersion>;
@@ -314,8 +319,8 @@ export async function readBackupRecords(): Promise<{ records: BackupRecords; ver
         return metadata as Omit<MaterialVersion, "blob">;
       }),
       applications,
-      sourceSnapshots: [],
-      fieldChanges: [],
+      sourceSnapshots,
+      fieldChanges,
       catalogTableRows,
     },
     versions,

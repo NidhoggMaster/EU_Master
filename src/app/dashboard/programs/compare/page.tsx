@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getPrograms } from "@/lib/catalog-client";
-import { getMaterials } from "@/lib/db";
 import { CATEGORY_LABELS, MATERIAL_TYPE_LABELS, type CompareResponse, type Program } from "@/lib/types";
+import { getMaterials } from "@/lib/workspace-client";
 
 type Response = CompareResponse & { recommendations: { id: string; name: string; universities: string[]; similarity: number }[] };
 const euro = (value: number | null) => value == null ? "待核验" : new Intl.NumberFormat("zh-CN", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);

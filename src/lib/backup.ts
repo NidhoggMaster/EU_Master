@@ -3,7 +3,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { z } from "zod";
 import { readBackupRecords, replaceBackupRecords } from "./db";
-import type { BackupRecords, MaterialVersion } from "./types";
+import type { BackupRecords, LegacyMigrationPreview, MaterialVersion } from "./types";
 
 const MAGIC = strToU8("EUMA");
 const ENCRYPTION_VERSION = 1;
@@ -150,4 +150,51 @@ export function downloadBlob(blob: Blob, fileName: string) {
   anchor.download = fileName;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function apiError(response: Response, fallback: string) {
+  try {
+    return (await response.json() as { error?: string }).error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function createServerBackup(password?: string) {
+  const response = await fetch("/api/storage/backup/export", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: password || undefined }),
+  });
+  if (!response.ok) throw new Error(await apiError(response, "备份生成失败。"));
+  const disposition = response.headers.get("content-disposition") || "";
+  const fileName = disposition.match(/filename="([^"]+)"/)?.[1] || `eu-master-backup.${password ? "eumaster" : "zip"}`;
+  return { blob: await response.blob(), fileName };
+}
+
+async function sendBackupFile<T>(url: string, file: File, password?: string) {
+  const form = new FormData();
+  form.set("file", file);
+  if (password) form.set("password", password);
+  const response = await fetch(url, { method: "POST", body: form });
+  if (!response.ok) throw new Error(await apiError(response, "备份操作失败。"));
+  return response.json() as Promise<T>;
+}
+
+export function inspectServerBackup(file: File, password?: string) {
+  return sendBackupFile<{ encrypted: boolean; exportedAt: string; schemaVersion: number; summary: LegacyMigrationPreview }>("/api/storage/backup/inspect", file, password);
+}
+
+export function restoreServerBackup(file: File, password?: string) {
+  return sendBackupFile<{ imported: LegacyMigrationPreview; summary: LegacyMigrationPreview }>("/api/storage/backup/restore", file, password);
+}
+
+export async function migrateLegacyIndexedDb(action: "preview" | "execute") {
+  const backup = await createBackup();
+  const form = new FormData();
+  form.set("action", action);
+  form.set("file", new File([backup.blob], backup.fileName, { type: "application/zip" }));
+  const response = await fetch("/api/storage/legacy-migration", { method: "POST", body: form });
+  if (!response.ok) throw new Error(await apiError(response, "IndexedDB 迁移失败。"));
+  return response.json() as Promise<{ summary: LegacyMigrationPreview; imported?: LegacyMigrationPreview }>;
 }

@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { runCatalogSeed, silentLogger } from "./seed-catalog.mjs";
 
-const health = (configured = true) => new Response(JSON.stringify({
-  status: configured ? "ready" : "incomplete",
-  database: { connected: true, restrictedRole: true, seededPrograms: 2, expectedSeededPrograms: 2 },
-  firecrawl: { configured },
+const health = (ready = true, firecrawl = false) => new Response(JSON.stringify({
+  status: ready ? "ready" : "error",
+  storage: { catalogMode: "local", local: { ready }, firecrawl: { configured: firecrawl } },
 }), { status: 200, headers: { "content-type": "application/json" } });
 
 const programs = (lastFetchedAt = undefined) => new Response(JSON.stringify([
@@ -16,18 +15,20 @@ const refreshed = (provider = "firecrawl") => new Response(JSON.stringify({ prov
   status: 200,
   headers: { "content-type": "application/json" },
 });
+const recorded = () => new Response(JSON.stringify({ recorded: true }), { status: 200, headers: { "content-type": "application/json" } });
 
 describe("catalog seed runner", () => {
-  it("stops before listing programs when Firecrawl is not configured", async () => {
+  it("stops before listing programs when local storage is not ready", async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(health(false));
-    await expect(runCatalogSeed({ fetchImpl, expectedPrograms: 2, logger: silentLogger() })).rejects.toThrow("FIRECRAWL_API_KEY");
+    await expect(runCatalogSeed({ fetchImpl, expectedPrograms: 2, logger: silentLogger() })).rejects.toThrow("本地 CSV");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("skips previously fetched programs and summarizes providers", async () => {
     const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(health())
-      .mockResolvedValueOnce(programs("2026-07-17T00:00:00.000Z"))
+      .mockResolvedValueOnce(health(true))
+      .mockResolvedValueOnce(programs(new Date().toISOString()))
+      .mockResolvedValueOnce(recorded())
       .mockResolvedValueOnce(refreshed("direct"));
     const summary = await runCatalogSeed({ fetchImpl, expectedPrograms: 2, delayMs: 0, retryDelays: [], logger: silentLogger() });
     expect(summary.skipped).toEqual(["one"]);
@@ -39,8 +40,9 @@ describe("catalog seed runner", () => {
   it("retries transient server failures and then succeeds", async () => {
     const waitImpl = vi.fn();
     const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(health())
-      .mockResolvedValueOnce(programs("2026-07-17T00:00:00.000Z"))
+      .mockResolvedValueOnce(health(true))
+      .mockResolvedValueOnce(programs(new Date().toISOString()))
+      .mockResolvedValueOnce(recorded())
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: "temporary" }), { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: "temporary" }), { status: 500 }))
       .mockResolvedValueOnce(refreshed());
@@ -52,11 +54,12 @@ describe("catalog seed runner", () => {
 
   it("does not retry rate limits and reports a failed result", async () => {
     const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(health())
-      .mockResolvedValueOnce(programs("2026-07-17T00:00:00.000Z"))
+      .mockResolvedValueOnce(health(true))
+      .mockResolvedValueOnce(programs(new Date().toISOString()))
+      .mockResolvedValueOnce(recorded())
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: "rate limited" }), { status: 429 }));
     const summary = await runCatalogSeed({ fetchImpl, expectedPrograms: 2, delayMs: 0, retryDelays: [1, 2], waitImpl: vi.fn(), logger: silentLogger() });
     expect(summary.failed).toEqual([{ id: "two", status: 429, error: "rate limited" }]);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 });

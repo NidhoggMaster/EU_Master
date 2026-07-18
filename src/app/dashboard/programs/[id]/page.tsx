@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getProgram, saveProgram } from "@/lib/catalog-client";
-import { cacheCatalogPrograms } from "@/lib/db";
 import { CATEGORY_LABELS, MATERIAL_TYPES, MATERIAL_TYPE_LABELS, type FieldChange, type MaterialType, type ProgramDetail, type ProgramRequirement } from "@/lib/types";
 
 export default function ProgramDetailPage() {
@@ -27,7 +26,7 @@ export default function ProgramDetailPage() {
       const response = await fetch(`/api/catalog/programs/${encodeURIComponent(id)}/refresh`, { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "更新失败。");
-      await cacheCatalogPrograms([body.program]); setProgram(body.program); setMessage(`官网数据已通过 ${body.provider === "firecrawl" ? "Firecrawl" : "合规直连回退"} 更新；${body.reviewItems.length} 项关键变更等待审核。${body.warnings?.[0] ? ` ${body.warnings[0]}` : ""}`);
+      setProgram(body.program); setMessage(`官网数据已通过 ${body.provider === "firecrawl" ? "Firecrawl" : "合规直连回退"} 更新；${body.reviewItems.length} 项关键变更等待审核。${body.warnings?.[0] ? ` ${body.warnings[0]}` : ""}`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "更新失败。"); }
     finally { setRefreshing(false); }
   }
@@ -36,7 +35,7 @@ export default function ProgramDetailPage() {
     const response = await fetch(`/api/catalog/programs/${id}/changes/${change.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ decision }) });
     const body = await response.json();
     if (!response.ok) { setMessage(body.error || "审核失败。"); return; }
-    await cacheCatalogPrograms([body]); setProgram(body); setMessage(decision === "accepted" ? "变更已确认写入。" : "变更已拒绝并保留审计记录。");
+    setProgram(body); setMessage(decision === "accepted" ? "变更已确认写入。" : "变更已拒绝并保留审计记录。");
   }
 
   async function addRequirement(event: React.FormEvent) {

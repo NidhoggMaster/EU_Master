@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { compareProgram, similarity } from "@/lib/matching";
 import { emptyProfile } from "@/lib/progress";
-import { getCurrentProfile, getProgramDetails, listPrograms } from "@/lib/server/catalog-repository";
+import { getProgramDetails, listPrograms } from "@/lib/server/catalog-service";
+import { getLocalProfile } from "@/lib/server/local-store";
 import { getEurCnyRate } from "@/lib/server/exchange-rates";
 import { MATERIAL_TYPES } from "@/lib/types";
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     const input = schema.parse(await request.json());
     const ids = [...new Set(input.programIds)];
     if (ids.length < 2) return NextResponse.json({ error: "请选择至少两个不同项目。" }, { status: 400 });
-    const [programs, profile, exchangeRate, catalog] = await Promise.all([getProgramDetails(ids), getCurrentProfile(), getEurCnyRate(), listPrograms()]);
+    const [programs, profile, exchangeRate, catalog] = await Promise.all([getProgramDetails(ids), getLocalProfile(), getEurCnyRate(), listPrograms()]);
     if (programs.length !== ids.length) return NextResponse.json({ error: "部分项目不存在。" }, { status: 404 });
     const ready = input.materials.filter((item) => item.status === "ready").map((item) => item.type);
     const candidateDetails = await getProgramDetails(catalog.filter((item) => !ids.includes(item.id)).map((item) => item.id));

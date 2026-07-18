@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listUniversities } from "@/lib/server/catalog-repository";
+import { listUniversities } from "@/lib/server/catalog-service";
 
 export const runtime = "nodejs";
 

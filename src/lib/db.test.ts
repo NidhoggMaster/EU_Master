@@ -52,7 +52,7 @@ describe("local database and backup", () => {
     const result = await createBackup();
     const file = new File([result.blob], result.fileName, { type: result.blob.type });
     const inspected = await inspectBackup(file);
-    expect(inspected.records.profile).toBeUndefined();
+    expect(inspected.records.profile?.basic.fullName).toBe("测试用户");
     expect(inspected.summary.programs).toBe(1);
     expect(inspected.records.catalogTableRows?.[0].programName).toBeTruthy();
     expect(inspected.summary.files).toBeGreaterThan(0);

@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { getApplications, getMaterials } from "@/lib/db";
 import { getPrograms } from "@/lib/catalog-client";
 import { getProfile } from "@/lib/profile-client";
 import { applicationProgress, profileCompletion } from "@/lib/progress";
 import { useLocalQuery } from "@/lib/use-local-query";
+import { getApplications, getMaterials } from "@/lib/workspace-client";
 
 async function loadDashboard() {
   const [profile, programs, materials, applications] = await Promise.all([

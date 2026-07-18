@@ -102,7 +102,14 @@ export async function getProgramDetail(id: string) {
 }
 
 export async function getProgramDetails(ids: string[]) {
-  return withDb(async (client) => (await Promise.all(ids.map((id) => detailWithClient(client, id)))).filter(Boolean) as ProgramDetail[]);
+  return withDb(async (client) => {
+    const details: ProgramDetail[] = [];
+    for (const id of ids) {
+      const detail = await detailWithClient(client, id);
+      if (detail) details.push(detail);
+    }
+    return details;
+  });
 }
 
 export async function upsertCandidate(input: { id?: string; universityId: string; name: string; category: ProgramCategory; sourceUrl: string; status?: Program["status"] }) {
@@ -212,4 +219,41 @@ export async function recordRefreshFailure(programId: string, message: string) {
   return withDb(async (client) => {
     await client.query("insert into private.program_refresh_runs (program_id,provider,status,warnings,completed_at,error_message) values ($1,'direct','failed','[]',now(),$2)", [programId, message.slice(0, 1000)]);
   });
+}
+
+export async function importProgramDetails(details: ProgramDetail[], overwriteIds: string[] = []) {
+  const overwrite = new Set(overwriteIds);
+  const imported: string[] = [];
+  for (const detail of details) {
+    const existing = await getProgramDetail(detail.id);
+    if (existing && !overwrite.has(detail.id)) continue;
+    if (!existing) {
+      const universityId = detail.institutionIds[0];
+      const category = detail.categories[0];
+      if (!universityId || !category) continue;
+      await upsertCandidate({ id: detail.id, universityId, name: detail.name, category, sourceUrl: detail.sourceUrl, status: detail.status });
+    }
+    await updateProgram(detail);
+    await withDb(async (client) => {
+      for (const universityId of detail.institutionIds) {
+        await client.query("insert into private.program_universities (program_id,university_id,is_primary) values ($1,$2,$3) on conflict do nothing", [detail.id, universityId, universityId === detail.institutionIds[0]]);
+      }
+      for (const source of detail.sources) {
+        const provider = ["seed", "firecrawl", "direct"].includes(source.provider) ? source.provider : "direct";
+        await client.query(`insert into private.program_sources (program_id,source_url,source_kind,title,provider,content_hash,excerpts,verification_state,fetched_at)
+          values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          on conflict (program_id,source_url) do update set title=excluded.title,provider=excluded.provider,content_hash=excluded.content_hash,excerpts=excluded.excerpts,verification_state=excluded.verification_state,fetched_at=excluded.fetched_at`,
+          [detail.id, source.sourceUrl, source.sourceKind || "program", source.title, provider, source.contentHash, JSON.stringify(source.excerpts), source.verificationState, source.fetchedAt ?? null]);
+      }
+      for (const change of detail.pendingChanges) {
+        const duplicate = await client.query("select 1 from private.program_field_changes where program_id=$1 and field=$2 and source_url=$3 and proposed_value=$4 and status='pending' limit 1", [detail.id, change.field, change.sourceUrl, change.proposedValue]);
+        if (duplicate.rowCount) continue;
+        await client.query(`insert into private.program_field_changes (program_id,field,label,previous_value,proposed_value,source_url,excerpt,confidence,risk,status,created_at)
+          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10)`,
+          [detail.id, change.field, change.label, change.previousValue, change.proposedValue, change.sourceUrl, change.excerpt, change.confidence, change.risk, change.createdAt]);
+      }
+    });
+    imported.push(detail.id);
+  }
+  return imported;
 }

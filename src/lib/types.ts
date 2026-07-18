@@ -399,3 +399,51 @@ export interface BackupRecords {
   fieldChanges: FieldChange[];
   catalogTableRows?: LocalCatalogRow[];
 }
+
+export type CatalogMode = "local" | "supabase";
+
+export interface StoredMaterialVersion extends Omit<MaterialVersion, "blob"> {
+  filePath: string;
+  downloadUrl: string;
+}
+
+export interface StorageStatus {
+  catalogMode: CatalogMode;
+  local: {
+    ready: boolean;
+    dataDirectory: string;
+    universities: number;
+    programs: number;
+  };
+  supabase: {
+    configured: boolean;
+    connected: boolean;
+    restrictedRole: boolean;
+    seededPrograms: number;
+    error?: string;
+  };
+  firecrawl: { configured: boolean };
+}
+
+export interface TransferConflict {
+  id: string;
+  name: string;
+  reason: "different" | "identical";
+}
+
+export interface TransferPreview {
+  from: CatalogMode;
+  to: CatalogMode;
+  newItems: Array<{ id: string; name: string }>;
+  conflicts: TransferConflict[];
+}
+
+export interface LegacyMigrationPreview {
+  profile: number;
+  programs: number;
+  materials: number;
+  materialVersions: number;
+  applications: number;
+  sourceSnapshots: number;
+  fieldChanges: number;
+}

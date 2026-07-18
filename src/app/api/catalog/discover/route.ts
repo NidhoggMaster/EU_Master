@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CatalogFetchError, discoverProgramsForUniversity } from "@/lib/catalog-server";
-import { getUniversity, listPrograms, upsertCandidate } from "@/lib/server/catalog-repository";
+import { getUniversity, listPrograms, upsertCandidate } from "@/lib/server/catalog-service";
+import { assertLocalMutation } from "@/lib/server/local-api";
 import { PROGRAM_CATEGORIES } from "@/lib/types";
 
 const requestSchema = z.object({
@@ -11,6 +12,7 @@ const requestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    assertLocalMutation(request);
     const input = requestSchema.parse(await request.json());
     const university = await getUniversity(input.universityId);
     if (!university) return NextResponse.json({ error: "找不到所选大学。" }, { status: 404 });
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof CatalogFetchError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) return NextResponse.json({ error: "项目发现参数不正确。" }, { status: 400 });
+    if (error && typeof error === "object" && "status" in error) return NextResponse.json({ error: error instanceof Error ? error.message : "请求来源无效。" }, { status: Number(error.status) });
     return NextResponse.json({ error: "项目发现暂时不可用。" }, { status: 500 });
   }
 }

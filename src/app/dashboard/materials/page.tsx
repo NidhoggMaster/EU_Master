@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { addMaterialVersion, createMaterial, deleteMaterial, getMaterials, getMaterialVersions, updateMaterial } from "@/lib/db";
-import { downloadBlob } from "@/lib/backup";
-import { MATERIAL_TYPES, MATERIAL_TYPE_LABELS, type Material, type MaterialType, type MaterialVersion } from "@/lib/types";
+import { MATERIAL_TYPES, MATERIAL_TYPE_LABELS, type Material, type MaterialType, type StoredMaterialVersion } from "@/lib/types";
 import { useLocalQuery } from "@/lib/use-local-query";
+import { addMaterialVersion, createMaterial, deleteMaterial, getMaterials, getMaterialVersions, updateMaterial } from "@/lib/workspace-client";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ["pdf", "doc", "docx", "jpg", "jpeg", "png"];
@@ -29,7 +28,7 @@ export default function MaterialsPage() {
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<string>();
-  const [versions, setVersions] = useState<Record<string, MaterialVersion[]>>({});
+  const [versions, setVersions] = useState<Record<string, StoredMaterialVersion[]>>({});
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -44,7 +43,7 @@ export default function MaterialsPage() {
       setTitle(""); setFile(undefined); setStatus("draft");
       const input = document.getElementById("material-file") as HTMLInputElement | null;
       if (input) input.value = "";
-      setMessage("材料和第一个版本已保存在当前浏览器。");
+      setMessage("材料和第一个版本已保存在本地数据目录。");
       reload();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "材料保存失败，浏览器空间可能不足。");
@@ -91,7 +90,7 @@ export default function MaterialsPage() {
 
   return (
     <div className="dashboard-content">
-      <header className="page-heading"><div><span className="dashboard-date">本地文件与版本</span><h1>材料中心</h1><p>文件只保存在当前浏览器，不会上传到服务器。</p></div><span className="count-badge">{materials.length} 份材料</span></header>
+      <header className="page-heading"><div><span className="dashboard-date">本地文件与版本</span><h1>材料中心</h1><p>文件只保存在当前电脑的数据目录，不会写入 Supabase。</p></div><span className="count-badge">{materials.length} 份材料</span></header>
       {(message || error) && <div className={`notice ${error ? "notice-error" : ""}`} role="status">{error || message}</div>}
 
       <section className="upload-panel">
@@ -119,7 +118,7 @@ export default function MaterialsPage() {
               </div>
               {expanded === material.id && (
                 <div className="version-list">
-                  {(versions[material.id] ?? []).map((version) => <div key={version.id}><span><strong>v{version.version}</strong>{version.fileName}<small>{fileSize(version.size)} · {new Date(version.createdAt).toLocaleString("zh-CN")}</small></span><button type="button" onClick={() => downloadBlob(version.blob, version.fileName)}>下载</button></div>)}
+                  {(versions[material.id] ?? []).map((version) => <div key={version.id}><span><strong>v{version.version}</strong>{version.fileName}<small>{fileSize(version.size)} · {new Date(version.createdAt).toLocaleString("zh-CN")}</small></span><a className="button button-secondary" href={version.downloadUrl} download={version.fileName}>下载</a></div>)}
                 </div>
               )}
             </article>

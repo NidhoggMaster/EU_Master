@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { deleteApplication, getApplications, getMaterials, saveApplication } from "@/lib/db";
 import { getPrograms } from "@/lib/catalog-client";
 import { applicationProgress } from "@/lib/progress";
 import type { Application, Material, Program } from "@/lib/types";
 import { useLocalQuery } from "@/lib/use-local-query";
+import { deleteApplication, getApplications, getMaterials, saveApplication } from "@/lib/workspace-client";
 
 async function loadApplications() {
   const [applications, programs, materials] = await Promise.all([getApplications(), getPrograms(), getMaterials()]);

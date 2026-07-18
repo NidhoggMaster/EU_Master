@@ -3,6 +3,7 @@ import "server-only";
 import type { ExchangeRate } from "@/lib/types";
 import { parseEcbEurCny } from "@/lib/exchange-rates";
 import { latestExchangeRate, saveExchangeRate } from "./catalog-repository";
+import { getCatalogMode, getLocalMeta, setLocalMeta } from "./local-store";
 
 const ECB_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 
@@ -11,7 +12,11 @@ function mapRow(row: Record<string, unknown>, stale = false): ExchangeRate {
 }
 
 export async function getEurCnyRate(): Promise<ExchangeRate> {
-  const cached = await latestExchangeRate();
+  const localMode = (await getCatalogMode()) === "local";
+  const localValue = localMode ? await getLocalMeta("eurCnyRate") : undefined;
+  const cached = localMode
+    ? localValue ? JSON.parse(localValue) as Record<string, unknown> : undefined
+    : await latestExchangeRate();
   if (cached && Date.now() - new Date(cached.fetched_at).getTime() < 12 * 60 * 60 * 1000) return mapRow(cached);
   try {
     const response = await fetch(ECB_URL, { headers: { accept: "application/xml", "user-agent": "EU-Master-NL/1.0" }, signal: AbortSignal.timeout(10_000), cache: "no-store" });
@@ -19,7 +24,8 @@ export async function getEurCnyRate(): Promise<ExchangeRate> {
     const xml = await response.text();
     const { effectiveDate: date, rate } = parseEcbEurCny(xml);
     const fetchedAt = new Date().toISOString();
-    await saveExchangeRate({ effectiveDate: date, rate, sourceUrl: ECB_URL, fetchedAt });
+    if (localMode) await setLocalMeta("eurCnyRate", JSON.stringify({ effective_date: date, rate, source_url: ECB_URL, fetched_at: fetchedAt }));
+    else await saveExchangeRate({ effectiveDate: date, rate, sourceUrl: ECB_URL, fetchedAt });
     return { baseCurrency: "EUR", quoteCurrency: "CNY", effectiveDate: date, rate, sourceUrl: ECB_URL, fetchedAt, stale: false };
   } catch (error) {
     if (cached) return mapRow(cached, true);
