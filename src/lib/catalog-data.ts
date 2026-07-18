@@ -1,5 +1,7 @@
 import type { Program, ProgramCategory, University } from "./types";
+import { rankingsForProgram, universityRankingsFor } from "./qs-ranking-data";
 
+const now = "2026-07-19T00:00:00.000Z";
 const now = "2026-07-17T00:00:00.000Z";
 const TILBURG_LIVING_COST_URL = "https://www.tilburguniversity.edu/education/masters-programs/tuition-fees-scholarships#:~:text=Estimated%20monthly%20costs,200%C2%A0per%20year";
 
@@ -27,6 +29,7 @@ for (const university of universities) {
     locationNotes: "",
     livingCostMonthlyMinEur: null,
     livingCostMonthlyMaxEur: null,
+    rankings: universityRankingsFor(university.id),
   });
 }
 
@@ -44,6 +47,7 @@ function program(
   categories: ProgramCategory[],
   sourceUrl: string,
 ): Program {
+  const rankings = rankingsForProgram({ id, institutionIds });
   return {
     id,
     institutionIds,
@@ -79,7 +83,7 @@ function program(
     updatedAt: now,
     seeded: true,
     overview: null,
-    rankings: [],
+    rankings,
     careerOutcomes: [],
     applicationDates: [],
     testRequirements: [],
@@ -95,7 +99,7 @@ function program(
       studielinkUrl: "https://www.studielink.nl/",
     },
     admissionProbabilityPrior: null,
-    fieldLocks: [],
+    fieldLocks: rankings.length ? ["rankings"] : [],
   };
 }
 

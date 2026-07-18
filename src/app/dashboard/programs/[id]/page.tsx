@@ -14,6 +14,7 @@ import {
   type MaterialType,
   type ProgramDetail,
   type ProgramRequirement,
+  type RankingFact,
 } from "@/lib/types";
 
 function SectionHeading({ label, title, url, children }: { label: string; title: string; url?: string; children?: ReactNode }) {
@@ -22,6 +23,16 @@ function SectionHeading({ label, title, url, children }: { label: string; title:
 
 function sourceLabel(origin: string) {
   return origin === "official" ? "官网" : origin === "manual" ? "手工" : "估算";
+}
+
+function RankingCards({ rankings }: { rankings: RankingFact[] }) {
+  return <div className="ranking-grid">{rankings.map((ranking) => <article key={ranking.id}>
+    <span>{ranking.provider} · {ranking.year}</span>
+    <strong>{ranking.rank}</strong>
+    <p>{ranking.subject}</p>
+    {ranking.summaryZh && <small>{ranking.summaryZh}</small>}
+    <a href={ranking.sourceUrl} target="_blank" rel="noreferrer">{sourceLabel(ranking.origin)}来源<ExternalLink size={12} aria-hidden="true" /></a>
+  </article>)}</div>;
 }
 
 function displayDate(value: string) {
@@ -121,6 +132,8 @@ export default function ProgramDetailPage() {
   const overviewUrl = program.overview?.sourceUrl || program.applicationLinks.programUrl || program.sourceUrl;
   const eligibilityUrl = program.applicationLinks.eligibilityUrl || program.sourceUrl;
   const testRequirementUrl = program.testRequirements[0]?.sourceUrl || eligibilityUrl;
+  const universityRankings = program.rankings.filter((ranking) => ranking.scope === "university");
+  const subjectRankings = program.rankings.filter((ranking) => ranking.scope === "subject");
   const recordedSourceUrls = new Set(program.sources.map((source) => source.sourceUrl));
   const fieldSources = new Map<string, string>();
   const addFieldSource = (url: string | undefined, label: string) => {
@@ -157,8 +170,11 @@ export default function ProgramDetailPage() {
     </section>
 
     <section className="dashboard-panel detail-section">
-      <SectionHeading label="项目与学校" title="排名" url={program.rankings[0]?.sourceUrl}>{program.rankings.length > 0 && <span className="zero-state-tag">{program.rankings.length} 项</span>}</SectionHeading>
-      {program.rankings.length ? <div className="ranking-grid">{program.rankings.map((ranking) => <article key={ranking.id}><span>{ranking.provider} · {ranking.year}</span><strong>{ranking.rank}</strong><p>{[ranking.subject, ranking.region].filter(Boolean).join(" · ")}</p><a href={ranking.sourceUrl} target="_blank" rel="noreferrer">{sourceLabel(ranking.origin)}来源<ExternalLink size={12} aria-hidden="true" /></a></article>)}</div> : <p className="empty-inline">官网未披露适用于本项目的排名。</p>}
+      <SectionHeading label="项目与学校" title="QS 排名" url={program.rankings[0]?.sourceUrl}>{program.rankings.length > 0 && <span className="zero-state-tag">{program.rankings.length} 项</span>}</SectionHeading>
+      {program.rankings.length ? <div className="ranking-groups">
+        {universityRankings.length > 0 && <section><h3>学校总榜 · QS 2027</h3><RankingCards rankings={universityRankings} /></section>}
+        {subjectRankings.length > 0 && <section><h3>最接近项目方向的学科榜 · QS 2026</h3><p className="ranking-scope-note">{program.institutionIds.length > 1 ? "联合项目没有单独 QS 名次；下列排名分别反映合作院校的相关学科底盘。" : "下列学科排名用于判断相关学科底盘，不等同于项目自身排名。"}</p><RankingCards rankings={subjectRankings} /></section>}
+      </div> : <p className="empty-inline">尚未录入适用于本项目的排名。</p>}
     </section>
 
     <section className="dashboard-panel detail-section">
